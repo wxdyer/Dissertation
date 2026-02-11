@@ -11,68 +11,60 @@ This R Markdown file is based on Revol et al. (2024) and their step-by-step guid
 
 ---
 
-```{r setup, message=FALSE, warning=FALSE, results='hide', include=FALSE}
-# Load required packages
-library(here)
+Import the packages:
+```{r, message=FALSE, warning=FALSE}
+library(esmtools) # For button(), txt() functions
+
+# For data management
 library(dplyr)
-library(readr) 
-library(readxl) 
-library(janitor)
-library(psych)
+library(tidyr)
+library(data.table)
+library(here)
+
+# Descriptive statistics
 library(skimr)
-library(Hmisc)
-library(knitr)
-library(esmtools)
+
+# Missing values inspection
 library(naniar)
 library(visdat)
+
+# Plotting
 library(ggplot2)
-library(tidyr)
+
+# To modify characters
+library(stringr)
+
+# Dates
 library(lubridate)
+library(hms)
+```
 
-# Define paths to intermediate files
-part6_path <- here("output", "part6beeped.rds")
+# Step 1: Import data and preliminary preprocessing
+
+This section is dedicated to the first look at the data, the merging of data sources the first basic preprocessing methods (e.g., duplicates, branching items check), and checking the variable consistency when the data has just been imported.
+
+Import the data: 
+```{r}
+#Define paths to intermediate file
+
 part2_path <- here("output", "part2beeped.rds")
-baseline_path <- here("output", "baseline2.rds")
+
+# Read baseline and part2 EMA data
+part2 <- readRDS(part2_path)
 ```
 
-# Load and merge EMA Data
+
 ```{r}
-part6beeped_1 <- readRDS(part6_path) %>%
-  mutate(source = "part6")
+# Get meta-information for Part 2 EMA
+dataInfo(
+  part2,
+  idvar   = "participant_id",
+  timevar = "init_time"
+)
 
-part2beeped_1 <- readRDS(part2_path) %>%
-  mutate(source = "part2")
-
-merged_ema <- bind_rows(part6beeped_1, part2beeped_1)
 ```
 
-#Load and select Baseline Covariates
-```{r}
-baseline <- readRDS(baseline_path) %>%
-  dplyr::select(
-    participant_id,
-    race,
-    age,
-    gender,
-    total_household_income,
-    bank_balance,
-    ftnd_sum,
-    cigsperday
-  )
-```
 
-#Merge EMA and baseline data into one dataframe called 'd'.
-```{r}
-d <- merge(merged_ema, baseline, by = "participant_id")
-```
-
-#The baseline and EMA data are now combined in the dataframe called 'd' and organized based on their variable type.
-
-#First Glimpse (Merged (Baseline and EMA) Data)
-View(d)
-#skim(d)
-
-#Reformatting: step skipped here because it was completed in previous RMDs
 #Duplication
 ```{r}
 #Duplicated rows? (none detected)
