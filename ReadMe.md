@@ -1,6 +1,6 @@
 # DVAL Study
 
-This repository contains the preprocessing and analysis workflow for the DVAL study (as of 7.9.25), including data import, cleaning, merging, and exploration according to Revol and colleauges' guidelines for preprocessing EMA data (Revol et. al, 2024).
+This repository contains the preprocessing and analysis workflow for the a secondary analysis of the DVAL study, including data import, cleaning, merging, and exploration according to Revol and colleauges' guidelines for preprocessing EMA data (Revol et. al, 2024).
 
 The repository is intended as a shared workspace for DVAL Lab collaborators and includes all scripts, intermediate data, and documentation required to reproduce results from raw data through publication-ready output.
 
