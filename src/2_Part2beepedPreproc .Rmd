@@ -6,239 +6,91 @@ output: html_document
 ---
 
 ```{r setup, include = FALSE}
-# Load required packages
+#Load required packages
 library(here)
 library(dplyr)
 library(lubridate)
+library(readr)
 library(janitor)
+library(tidyr)
 
-# Define path to EMA Part 2 data
+#Define path to EMA Part 2 data
 part2_path <- here("data", "DVAL_EMA_Part2_beeped.csv")
 ```
 
 ```{r}
-# Import EMA data and define missing values
-part2beeped <- read.csv(part2_path, 
-                        na.strings = c("-99", "__NA__"), 
-                        stringsAsFactors = FALSE)
-
-```
-#Removal of variables with 100% missing data due to how the survey was programmed (Refer to DREAM manual.pdf for explanation): Milestone_3 - Milestone_10; Milestone_3_time - Milestone_10_time.
-```{r}
-part2beeped <- part2beeped[ , !(names(part2beeped) %in% 
-  c(paste0("Milestone_", 3:10), paste0("Milestone_", 3:10, "_time")))]
-```
-
-#Reformatting. Because there is a risk of losing data during reformatting, I have included chunks of code throughout this section to check for missingness. Early on, discrepancies were identified. By the end, all cases were accounted for (vs. lost without a reason).
-```{r}
-#Pre-reformatting actions
-#Create object to represent all time variables to have on hand for subsequent fidelity checks (i.e., I wanted to check the missingness for these variables before and after reformatting, and this was a handy way to set things up.)
-date_time_vars <- c(
-  "init_time", "completion_time", "submission_time", "happy_time", "dissatisfied_time", 
-  "irritable_time", "relaxed_time", "depressed_time", "mentally_exhausted_time", 
-  "elated_time", "stressed_time", "difficulty_concentrating_time", "health_time", 
-  "mood_time", "energy_level_time", "smoke_time", "motivated_time", "confident_time", 
-  "pay_time", "easy_difficult_time", "before_survey_time", "pleasant_time", "neutral_time", 
-  "unpleasant_time", "prior_mood_time", "pleasurable_activities_time", 
-  "stressful_occurrence_time", "how_stressful_time", "location_time", 
-  "current_location_time", "who_been_with_time", "smoking_now_time", 
-  "physically_active_time", "smoked_since_last_survey_time", "consumed_time", 
-  "upcoming_activities_time", "time_start", "time_complete", "time_submit", "Milestone_1_time", "Milestone_2_time"
+#Import data and define missing values for EMA variables to be used study analyses
+# Define subset of participants
+subset_ids <- c(
+  102, 104, 107, 112, 113, 115, 116, 124, 125, 126, 127, 128, 133, 141, 
+  150, 151, 154, 159, 163, 164, 166, 169, 175, 177, 180, 186, 188, 192, 
+  195, 196, 197, 198, 199, 202, 206, 209, 210, 213, 214, 216, 218, 221, 
+  222, 223, 233, 238, 240, 246, 252, 257, 262, 268, 273, 274, 278, 281, 
+  282, 286, 287, 290, 291, 295, 297, 300, 301, 304, 310, 314, 320, 321, 
+  329, 332, 340, 341, 342, 344, 346, 349, 351, 356, 362, 363, 369, 370, 
+  372, 381, 383, 393, 394, 399, 416, 423, 427, 428, 430
 )
 
-#Create object to check missingness before reformatting.
-date_time_counts_before <- colSums(!is.na(part2beeped[date_time_vars]))
-```
-
-```{r}
-#Code to investigate an issue that was discovered in the following steps involving an increase in missingness for the variables 'completion_time', 'time_complete', 'date_complete'. After circling back and adding this chunk of code to investigate, the cause was determined: the text 'NA' in 162 cells was recognized as non-missing, even though it was meant to represent missing data.
-#Check for empty strings, literal "NA" strings, and actual NAs for 'completion_time'
-table(part2beeped$completion_time == "")           # empty strings
-table(part2beeped$completion_time == "NA")         # literal "NA" strings
-table(is.na(part2beeped$completion_time))          # actual NAs
-#Check for empty strings, literal "NA" strings, and actual NAs for `time_complete`
-cat("----- time_complete -----\n")
-print(table(part2beeped$time_complete == ""))       # empty strings
-print(table(part2beeped$time_complete == "NA"))     # literal "NA" strings
-print(table(is.na(part2beeped$time_complete)))      # actual NAs
-#Check for empty strings, literal "NA" strings, and actual NAs for `date_complete`
-cat("----- date_complete -----\n")
-print(table(part2beeped$date_complete == ""))       # empty strings
-print(table(part2beeped$date_complete == "NA"))     # literal "NA" strings
-print(table(is.na(part2beeped$date_complete)))      # actual NAs
-```
-
-```{r}
-#Date & time variables are assigned 'POSIXct' format
-part2beeped = part2beeped %>%
-    mutate(across(c(init_time, completion_time, submission_time, happy_time, dissatisfied_time, 
-                    irritable_time, relaxed_time, depressed_time, mentally_exhausted_time, 
-                    elated_time, stressed_time, difficulty_concentrating_time, health_time, 
-                    mood_time, energy_level_time, smoke_time, motivated_time, confident_time, 
-                    pay_time, easy_difficult_time, before_survey_time, pleasant_time, neutral_time, 
-                    unpleasant_time, prior_mood_time, pleasurable_activities_time, 
-                    stressful_occurrence_time, how_stressful_time, location_time, 
-                    current_location_time, who_been_with_time, smoking_now_time, 
-                    physically_active_time, smoked_since_last_survey_time, consumed_time, 
-                    upcoming_activities_time, Milestone_1_time, Milestone_2_time), 
-                  ~ as.POSIXct(., tz="America/New_York", format="%Y-%m-%d %H:%M:%OS")))
-#Time variables reformatted to POSIXct separately from the above variables (Note: I needed to add a default date in order to use POSIXct format. Below, the date 1970-01-01 was used as is common in these cases).
-part2beeped = part2beeped %>%
-    mutate(across(c(time_start, time_complete, time_submit), 
-                  ~ as.POSIXct(paste("1970-01-01", .), tz="America/New_York", format="%Y-%m-%d %H:%M:%S")))
-```
-
-#Check fidelity of the reformatting process (note that the missingness before and after is identitcal, other than the variables 'completion_time' and 'time_complete', where missingness increased. It was determined that this was due to 162 cells with the text 'NA' being recognized as actual data. After the reformatting action, these 'NA' values were converted to actual missing data, and R now recognizes them as such.)
-```{r}
-#Create objects to check missingness after reformatting.
-date_time_counts_after <- colSums(!is.na(part2beeped[date_time_vars]))
-#Create a table for before/after missingness comparison.
-date_time_before_after_comparison <- data.frame(before = date_time_counts_before, after = date_time_counts_after)
-print(date_time_before_after_comparison)
-```
-
-
-#Reformatting continued.
-```{r}
-#Date (only) variables
-# Check non-missing count before reformatting
-survey_date_before <- sum(!is.na(part2beeped$survey_date))
-#Reformat survey_date
-part2beeped <- part2beeped %>%
-  mutate(
-    survey_date = case_when(
-      grepl("^\\d{2}/\\d{2}/\\d{2}$", survey_date) ~ mdy(survey_date),
-      grepl("^\\d{4}-\\d{2}-\\d{2}$", survey_date) ~ as.Date(survey_date),
-      TRUE ~ NA_Date_
-    )
+# Then run your read_csv + cleaning pipeline
+part2beeped <- read_csv(
+  part2_path,
+  na = c("-99", "__NA__", "NA", ""),
+  col_types = cols(.default = col_character()),
+  col_select = c(
+    mood,
+    smoke,
+    before_survey,
+    unpleasant,
+    prior_mood,
+    smoked_since_last_survey,
+    pleasant,
+    participant_id,
+    session_id,
+    completion_time,
+    init_time
   )
-#Check non-missing count after reformatting
-survey_date_after <- sum(!is.na(part2beeped$survey_date))
-# Create a comparison table
-survey_date_missingness_comparison <- data.frame(
-  before = survey_date_before,
-  after = survey_date_after
-)
-print(survey_date_missingness_comparison)
+) %>%
+  filter(as.numeric(participant_id) %in% subset_ids) %>%
+  mutate(
+    smoked_since_last_survey = ifelse(
+      smoked_since_last_survey == "opted out", "999", #Modification
+      ifelse(smoked_since_last_survey == "6+", "6", smoked_since_last_survey) #Modification
+    ),
+    mood = ifelse(mood == "opted out", "999", mood),
+    smoke = ifelse(smoke == "opted out", "999", smoke),
+    before_survey = ifelse(before_survey == "opted out", "999", before_survey),
+    unpleasant = ifelse(unpleasant == "opted out", "999", unpleasant),
+    pleasant = ifelse(pleasant == "opted out", "999", pleasant),
+    prior_mood = ifelse(prior_mood == "opted out", "999", prior_mood),
+    participant_id = ifelse(participant_id == "opted out", "999", participant_id),
+    session_id = ifelse(session_id == "opted out", "999", session_id)
+  ) %>%
+  mutate(
+    smoked_since_last_survey = as.numeric(smoked_since_last_survey), #Modification
+    prior_mood = as.numeric(prior_mood),
+    mood = as.numeric(mood),
+    smoke = as.numeric(smoke),
+    unpleasant = as.numeric(unpleasant),
+    pleasant = as.numeric(pleasant),
+    participant_id = as.numeric(participant_id),
+    session_id = as.numeric(session_id)
+  ) %>%
+  mutate(
+    across(c(init_time, completion_time), 
+           ~ as.POSIXct(., tz = "America/New_York", format = "%Y-%m-%d %H:%M:%OS"))
+  )
+
+# Quick glimpse
+glimpse(part2beeped)
+
+
 ```
 
-
-```{r}
-#Check non-missing counts before reformatting
-date_complete_before <- sum(!is.na(part2beeped$date_complete))
-date_submit_before <- sum(!is.na(part2beeped$date_submit))
-
-#Reformat both variables to Date
-part2beeped <- part2beeped %>%
-  mutate(across(c(date_complete, date_submit), as.Date))
-#Check non-missing counts after reformatting
-date_complete_after <- sum(!is.na(part2beeped$date_complete))
-date_submit_after <- sum(!is.na(part2beeped$date_submit))
-#Create a comparison table
-date_fields_missingness_comparison <- data.frame(
-  variable = c("date_complete", "date_submit"),
-  before = c(date_complete_before, date_submit_before),
-  after = c(date_complete_after, date_submit_after)
-)
-print(date_fields_missingness_comparison)
-
-```
-#Summary of reformatting date, date/time, and time variables: missingness increased for three variables, but this was due to an issue with how 162 cells with missing data were imported. No data were lost in these steps.
-
-#Reformatting continued (numeric variables).
-```{r}
-numeric_vars <- c(
-  "happy", "dissatisfied", "irritable", "relaxed", "depressed", "mentally_exhausted",
-  "elated", "stressed", "difficulty_concentrating", "health", "mood", "energy_level",
-  "smoke", "motivated", "confident", "pay", "easy_difficult", "pleasant", "unpleasant",
-  "prior_mood", "pleasurable_activities", "how_stressful", "physically_active",
-  "smoked_since_last_survey"
-)
-```
-
-#Check that all increases in missingness detected in the subsequent chunk of code are accounted for.
-```{r}
-#happy (3)
-bad_vals <- part2beeped$happy[!is.na(part2beeped$happy) & part2beeped$happy != "" & part2beeped$happy != "NA"]
-print(bad_vals[is.na(as.numeric(bad_vals))])
-
-#irritable (1)
-bad_vals <- part2beeped$irritable[!is.na(part2beeped$irritable) & part2beeped$irritable != "" & part2beeped$irritable != "NA"]
-print(bad_vals[is.na(as.numeric(bad_vals))])
-
-#relaxed (1)
-bad_vals <- part2beeped$irritable[!is.na(part2beeped$relaxed) & part2beeped$relaxed != "" & part2beeped$relaxed != "NA"]
-print(bad_vals[is.na(as.numeric(bad_vals))])
-
-#stressed (1)
-bad_vals <- part2beeped$stressed[!is.na(part2beeped$stressed) & part2beeped$stressed != "" & part2beeped$stressed != "NA"]
-print(bad_vals[is.na(as.numeric(bad_vals))])
-
-#difficulty_concentrating (1)
-bad_vals <- part2beeped$difficulty_concentrating[!is.na(part2beeped$difficulty_concentrating) & part2beeped$difficulty_concentrating != "" & part2beeped$difficulty_concentrating != "NA"]
-print(bad_vals[is.na(as.numeric(bad_vals))])
-
-#health (3)
-bad_vals <- part2beeped$health[!is.na(part2beeped$health) & part2beeped$health != "" & part2beeped$health != "NA"]
-print(bad_vals[is.na(as.numeric(bad_vals))])
-
-#mood (1)
-bad_vals <- part2beeped$mood[!is.na(part2beeped$mood) & part2beeped$mood != "" & part2beeped$mood != "NA"]
-print(bad_vals[is.na(as.numeric(bad_vals))])
-
-#confident (1)
-bad_vals <- part2beeped$confident[!is.na(part2beeped$confident) & part2beeped$confident != "" & part2beeped$confident != "NA"]
-print(bad_vals[is.na(as.numeric(bad_vals))])
-
-#pay (12)
-bad_vals <- part2beeped$pay[!is.na(part2beeped$pay) & part2beeped$pay != "" & part2beeped$pay != "NA"]
-print(bad_vals[is.na(as.numeric(bad_vals))])
-
-#pleasurable_activities (1)
-bad_vals <- part2beeped$pleasurable_activities[!is.na(part2beeped$pleasurable_activities) & part2beeped$pleasurable_activities != "" & part2beeped$pleasurable_activities != "NA"]
-print(bad_vals[is.na(as.numeric(bad_vals))])
-
-#smoked_since_last_survey (109)
-bad_vals <- part2beeped$smoked_since_last_survey[!is.na(part2beeped$smoked_since_last_survey) & part2beeped$smoked_since_last_survey != "" & part2beeped$smoked_since_last_survey != "NA"]
-print(bad_vals[is.na(as.numeric(bad_vals))])
-```
-
-```{r}
-#Create object to check missingness before reformatting.
-numeric_counts_before <- colSums (!is.na (part2beeped[numeric_vars]))
-#Based on the troubleshooting code above, 'smoked_since_last_survey' contains non-numeric values (i.e., '6+'). Because this variable will be treated as discrete for future analyses, it is reasonable to recode all instances of '6+' to '6'. The code below executes this function.
-part2beeped$smoked_since_last_survey <- gsub("^6\\+$", "6", part2beeped$smoked_since_last_survey)
-#Reformat numeric variables including a step to code all instances of 'opted out' (regardless of case) as '999'.
-part2beeped <- part2beeped %>%
-  mutate(across(all_of(numeric_vars), ~ case_when(
-    as.character(.) %in% c("opted out", "Opted out") ~ "999",
-    TRUE ~ as.character(.)
-  ))) %>%
-  mutate(across(all_of(numeric_vars), ~ as.numeric(.)))
-#Create object to check missingness after reformatting.
-numeric_counts_after <- colSums (!is.na (part2beeped[numeric_vars]))
-# Create a table for before/after missingness comparison
-numeric_before_after_comparison <- data.frame(
-  variable = names(numeric_counts_before),
-  before = numeric_counts_before,
-  after = numeric_counts_after
-)
-print(numeric_before_after_comparison)
-```
-
-#Summary of reformatting numeric variables: all introduced missingness is accounted for. Instances where participants 'opted out' were recoded as '999'. For 'smoked_since_last_survey', all cases of '6+' were recoded as '6'. These recoding steps allowed for the effective reformatting of numeric variables from character to numeric.
 
 #Run the 'clean_names' function in the janitor package, so that variable names with hyphens become variable names with underscores and all text in variable names becomes lowercase (e.g., 'Milestone_1' -> 'milestone_1').
 ```{r}
-part2beeped_1 <- clean_names(part2beeped)
+part2beeped <- clean_names(part2beeped)
 ```
-
-#First Glimpse for EMA data - included in this RMD as for a "quick and efficient overview of the dataset." The code is not "chunked" because it takes a long time to run and is optional.
-
-#View structure of data (Examine variable types and dataset dimensions)
-glimpse(part2beeped_1)
-#View descriptive statistics (For each variable, examine % missing, mean, sd, frequencies by quartile, and histogram)
-skim(part2beeped_1)
 
 # Save processed data to the /output directory
 ```{r}
