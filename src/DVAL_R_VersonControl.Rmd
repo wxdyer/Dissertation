@@ -1,0 +1,19 @@
+install.packages("renv")
+library(renv)
+
+#Initialize isolation of a project
+renv::init()
+
+#Install required packages
+source ("./required/DVAL_Rrequirements.R")
+
+#load required packages
+```{r}
+library(janitor)
+library(dplyr)
+library(lubridate)
+```
+
+
+#Snapshot the environment
+renv::snapshot()

@@ -1,0 +1,158 @@
+---
+title: "ESM Preprocessing Step 4"
+author: "DVAL Lab"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+# Overview
+
+This R Markdown file is based on Step 4 of the Revol et al. (2024) preprocessing pipeline:  
+[https://preprocess.esmtools.com](https://preprocess.esmtools.com)  
+It focuses on computing and transforming variables as needed for analysis.
+
+---
+
+```{r setup, include=FALSE}
+library(here)
+library(dplyr)
+
+# Define path to the Step 3 output
+file_path <- here("output", "EMA_and_baseline3.rds")
+```
+
+#Read in the data
+```{r}
+d <- readRDS(file_path)
+```
+
+#Centering
+#First, I create groups of continuous variables to streamline centering procedures (groups modified from Step 2 RMD -- the groups below omit categorical variables that were included in the original groups)
+```{r}
+current_state_vars <- c("happy", "dissatisfied", "irritable", "relaxed", "depressed", 
+                        "mentally_exhausted", "elated", "stressed", "difficulty_concentrating", 
+                        "health", "mood", "energy_level")
+
+current_smok_vars <- c("smoke", "motivated", "confident", "pay", "easy_difficult")
+
+prior_eventapp_vars <- c("pleasant", "unpleasant")
+
+other_eventapp_vars <- c("prior_mood", "pleasurable_activities", 
+                         "how_stressful") 
+
+lagged_behavior_vars <- c("physically_active")
+vars_to_center <- c(current_state_vars, current_smok_vars, prior_eventapp_vars, other_eventapp_vars, lagged_behavior_vars)
+```
+#Create person-means for each continuous variable
+```{r}
+d <- d %>%
+  group_by(participant_id) %>%
+  mutate(across(all_of(vars_to_center),
+                ~ ifelse(.x == 999, NA, mean(.x[.x != 999], na.rm = TRUE)),
+                .names = "{.col}_pm")) %>%
+  ungroup()
+```
+
+#Create lag variables for each continuous variable
+```{r}
+d <- d %>%
+  arrange(participant_id, obsno) %>%
+  group_by(participant_id) %>%
+  mutate(across(all_of(vars_to_center),
+                ~ ifelse(beep_in_day == 1, NA, lag(ifelse(.x == 999, NA, .x))), #suppress the lag for first-of-day values
+                .names = "{.col}_lag")) %>%
+  ungroup()
+
+```
+
+#Create lead variables for each continuous variable
+```{r}
+d <- d %>%
+  arrange(participant_id, obsno) %>%
+  group_by(participant_id) %>%
+  mutate(across(all_of(vars_to_center),
+                ~ ifelse(beep_in_day == 6, NA, lead(ifelse(.x == 999, NA, .x))), #suppress the lead for last-of-day values
+                .names = "{.col}_lead")) %>%
+  ungroup()
+
+```
+
+#Grand-mean center each variable (based on the variable mean)
+```{r}
+d <- d %>%
+  mutate(across(all_of(vars_to_center),
+                ~ ifelse(.x == 999, NA, .x - mean(.x[.x != 999], na.rm = TRUE)),
+                .names = "{.col}_gc"))
+
+#Check that grand-mean centering worked by examining the means for all *_gc variables (note: they should all equal zero)
+d %>%
+  summarise(across(ends_with("_gc"), ~ round(mean(.x, na.rm = TRUE), 4)))
+```
+#Person-mean center each variable (based on subjects' mean for each variable)
+```{r}
+d <- d %>%
+  group_by(participant_id) %>%
+  mutate(across(all_of(vars_to_center),
+                ~ ifelse(.x == 999, NA, .x - mean(.x[.x != 999], na.rm = TRUE)),
+                .names = "{.col}_pc")) %>%
+  ungroup()
+#Check that person-mean centering worked by examining the means for each *_pc variable
+d %>%
+ group_by(participant_id) %>%
+  summarise(across(ends_with("_pc"), ~ round(mean(.x, na.rm = TRUE), 4)))
+```
+
+#Lag and person-mean center each variable (creating a lag variable and centering its values based on subjects' original variable mean)
+```{r}
+d <- d %>%
+  group_by(participant_id) %>%
+  mutate(across(all_of(vars_to_center),
+                ~ ifelse(lag(.x) == 999, NA, lag(.x) - mean(.x[.x != 999], na.rm = TRUE)),
+                .names = "{.col}_lag_pc")) %>%
+  ungroup()
+
+#Check that it worked by view a FeValues will not be exactly zero because the above code lags before it centers. The below output serves as an opportunity to check whether strange values or grouping errors occurred.
+#Happy
+d %>%
+  filter(!is.na(happy_lag_pc)) %>%
+  group_by(participant_id) %>%
+  summarise(mean_lag_pc = round(mean(happy_lag_pc, na.rm = TRUE), 4))
+d %>%
+  filter(!is.na(motivated_lag_pc)) %>%
+  group_by(participant_id) %>%
+  summarise(mean_lag_pc = round(mean(motivated_lag_pc, na.rm = TRUE), 4))
+
+d %>%
+  filter(!is.na(pleasant_lag_pc)) %>%
+  group_by(participant_id) %>%
+  summarise(mean_lag_pc = round(mean(pleasant_lag_pc, na.rm = TRUE), 4))
+```
+#A problem was detected in the above step: pleasant_lag_pc = 12.0. The below code is to troubleshoot. 
+```{r}
+d %>%
+  filter(participant_id == 213) %>%
+  arrange(obsno) %>%
+  mutate(
+    lag_pleasant = lag(pleasant),
+    person_mean = mean(pleasant[pleasant != 999], na.rm = TRUE),
+    pleasant_lag_pc_calc = ifelse(lag_pleasant == 999, NA, lag_pleasant - person_mean)
+  ) %>%
+  dplyr::select(obsno, pleasant, lag_pleasant, person_mean, pleasant_lag_pc, pleasant_lag_pc_calc)
+```
+#Summary (5/16/25): Data from participant 213 is flagged due to their high degree of missingness (~92%) for 'pleasant'. Other participants with high missingness should be considered as well. If we want to keep
+
+#Check computation: Step was integrated into the previous chunks of code. More can be done in the future with checking computation, if warranted.
+#Lag scores: lag and lead scores for same day beeps were calculated above
+#Common scores
+#Below is an example of how we can calculate summary statistics for a given variable across participants. More can be done with descriptive statistics.
+```{r}
+d %>%
+  dplyr::summarize(happy_gm = mean(ifelse(happy == 999, NA, happy), na.rm = TRUE))
+```
+#Affect scores: Step skipped and will be returned to following the identification of scores we want to calculate.
+
+#Save current dataframe
+```{r}
+saveRDS(d, here("EMA_and_baseline4.rds"))
+```
+

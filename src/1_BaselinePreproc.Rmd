@@ -1,0 +1,207 @@
+---
+title: "Baseline Preprocessing"
+author: "WGD"
+date: "`r Sys.Date()`"
+output: html_document
+git practice edit
+---
+
+```{r setup, include = FALSE}
+# Load required packages
+library(here)
+library(readxl)
+library(dplyr)
+library(janitor)
+library(ggplot2)
+
+# Define paths to input data
+Apath <- here("data", "QuestionnairesA.xlsx")
+Bpath <- here("data", "QuestionnairesB.xlsx")
+```
+
+```{r}
+# Read files into dataframes A and B
+A <- read_excel(Apath)
+B <- read_excel(Bpath)
+```
+
+#Merge the baseline datasets
+```{r}
+baseline <- merge(A, B, by = "participant-id", all = TRUE, suffixes = c(".A", ".B"))
+```
+
+#Run the 'clean_names' function in the janitor package, so that variable names with hyphens become variable names with underscores (e.g., 'participant-id' -> 'participant_id') and all text in variable names becomes lowercase.
+```{r}
+baseline1 <- clean_names(baseline)
+```
+#Filter the data so that only participants whose data meet fMRI and EMA quality check criteria (as of 2.4.25) are included.
+```{r}
+analytic_sample <- c(102, 104, 107, 112, 116, 124, 125, 126, 128, 141,
+                     151, 154, 159, 163, 164, 166, 169, 175, 177, 180,
+                     192, 195, 198, 206, 210, 213, 218, 222, 223, 233,
+                     238, 246, 257, 262, 273, 274, 278, 282, 286, 287,
+                     290, 291, 295, 310, 314, 320, 329, 332, 340, 344,
+                     346, 349, 369, 370, 372, 381, 383, 423, 430)
+baseline2 <- baseline1[baseline1$participant_id %in% analytic_sample,]
+```
+#Next section containts measure-specific renaming and computing of baseline measures.
+
+#FTND  (Fagerstrom, 2011; Heatherton et. al, 1991)
+```{r}
+#Rename ftnd_4 'cigsperday'
+baseline2 <- baseline2 %>%
+  rename(cigsperday = ftnd_4)
+#Recode an item of the FTND, 'ftnd_4', so that an overall FTND_sum score can be calculated.
+
+baseline2 <- baseline2 %>%
+  mutate(ftnd_4 = case_when(
+    cigsperday <= 10 ~ 1,
+    cigsperday > 10 & cigsperday <= 20 ~ 2,
+    cigsperday > 20 & cigsperday <= 30 ~ 3,
+    cigsperday > 30 ~ 4
+  ))
+
+#Create a FTND_sum score
+baseline2 <- baseline2 %>%
+  mutate(ftnd_sum = ftnd_1 + ftnd_2 + ftnd_3 + ftnd_4 + ftnd_5 + ftnd_6)
+```
+
+#Wisconsin Inventory of Smoking Dependence Motives (WISDM-68; Piper et. al, 2004)
+```{r}
+#The WISDM yields 13 subscales. To calculate the scores of the subscales, take the mean of the items that load onto each subscale. The total scale score is the sum of all of the subscale scores. Below is the code for the creation of each of the 13 subscales.
+#Affiliative Attachment
+baseline2 <- baseline2 %>%
+  mutate(wis_aff_att = rowSums(across(c(q12_wis_20, q12_wis_36, q12_wis_43, q12_wis_48, q12_wis_67)), na.rm = TRUE))
+#Automaticity
+baseline2 <- baseline2 %>%
+  mutate(wis_auto = rowSums(across(c(q12_wis_5, q12_wis_19, q12_wis_26, q12_wis_41, q12_wis_55)), na.rm = TRUE))
+#Loss of Control
+baseline2 <- baseline2 %>%
+  mutate(wis_loc = rowSums(across(c(q12_wis_6, q12_wis_28, q12_wis_34, q12_wis_62)), na.rm = TRUE))
+#Behavioral Choice/Melioration
+baseline2 <- baseline2 %>%
+  mutate(wis_behchoi_mel = rowSums(across(c(q12_wis_10, q12_wis_21, q12_wis_35, q12_wis_38, q12_wis_46, q12_wis_49, q12_wis_68)), na.rm = TRUE))
+#Cognitive Enhancement
+baseline2 <- baseline2 %>%
+  mutate(wis_cog_enh = rowSums(across(c(q12_wis_13, q12_wis_15, q12_wis_24, q12_wis_39, q12_wis_57)), na.rm = TRUE))
+#Craving
+baseline2 <- baseline2 %>%
+  mutate(wis_cra = rowSums(across(c(q12_wis_11, q12_wis_29, q12_wis_37, q12_wis_50)), na.rm = TRUE))
+#Cue Exposure/Associative Processes
+baseline2 <- baseline2 %>%
+  mutate(wis_cue_assproc = rowSums(across(c(q12_wis_4, q12_wis_17, q12_wis_23, q12_wis_40, q12_wis_42, q12_wis_51, q12_wis_59)), na.rm = TRUE))
+#Negative Reinforcement
+baseline2 <- baseline2 %>%
+  mutate(wis_neg = rowSums(across(c(q12_wis_7, q12_wis_18, q12_wis_25, q12_wis_32, q12_wis_58, q12_wis_65)), na.rm = TRUE))
+#Positive Reinforcement
+baseline2 <- baseline2 %>%
+  mutate(wis_pos = rowSums(across(c(q12_wis_3, q12_wis_8, q12_wis_45, q12_wis_60, q12_wis_64)), na.rm = TRUE))
+#Social/Environmental Goals
+baseline2 <- baseline2 %>%
+  mutate(wis_soc = rowSums(across(c(q12_wis_22, q12_wis_30, q12_wis_44, q12_wis_52)), na.rm = TRUE))
+#Taste/Sensory Processes
+baseline2 <- baseline2 %>%
+  mutate(wis_tas_sen = rowSums(across(c(q12_wis_1, q12_wis_12, q12_wis_27, q12_wis_33, q12_wis_53, q12_wis_66)), na.rm = TRUE))
+#Tolerance
+baseline2 <- baseline2 %>%
+  mutate(wis_tol = rowSums(across(c(q12_wis_9, q12_wis_14, q12_wis_47, q12_wis_54, q12_wis_63)), na.rm = TRUE))
+summary(baseline2$wis_tol)
+#Weight Control
+baseline2 <- baseline2 %>%
+  mutate(wis_weight = rowSums(across(c(q12_wis_2, q12_wis_16, q12_wis_31, q12_wis_56, q12_wis_61)), na.rm = TRUE))
+```
+
+#Behavioral Inhibition, Behavioral Activation Scales (BIS/BAS; Carver & White, 1994)
+```{r}
+
+```
+
+
+
+
+#Positive and Negative Affect Schedule - Trait Version (PANAS-SF; Thompson, 2007; Watson et, al. 1988)
+```{r}
+#Create a subscale score for the positive and negative affect scales from the Positive and Negative Affect Schedule.
+#Create the positive affect subscale
+baseline2 <- baseline2 %>%
+  mutate(panas_pos = q64_pan_1 + q64_pan_3 + q64_pan_5 + q64_pan_9 + q64_pan_10 + q64_pan_12 + q64_pan_14 + q64_pan_16 + q64_pan_17 + q64_pan_19)
+
+#Create the negative affect subscale
+baseline2 <- baseline2 %>%
+  mutate(panas_neg = q64_pan_2 + q64_pan_4 + q64_pan_6 + q64_pan_7 + q64_pan_8 + q64_pan_11 + q64_pan_13 + q64_pan_15 + q64_pan_18 + q64_pan_20)
+```
+
+#Snaith-Hamilton Pleasure Scale (SHAPS;Snaith et. al., 1995)
+#Recode the SHAPS variables based on author guidelines and create a sum score.
+```{r}
+#Create a new series of variables for this measure so that all 1s and 2s become 1 and all 3s and 4s become 0s. The new variables have the suffix "_sim", which is an abbreviation for "simple", because the authors refer to this system as the "simple scoring system"
+baseline2 <- baseline2 %>%
+  mutate(across(starts_with("q14_sha_"), ~ifelse(. %in% c(1, 2), 1, 0), .names = "{.col}_sim"))
+#Create a sum score using the "_sim" variables
+baseline2 <- baseline2 %>%
+  mutate(shaps_sim_sum = q14_sha_1_sim + q14_sha_2_sim + q14_sha_3_sim + q14_sha_4_sim + q14_sha_5_sim + q14_sha_6_sim + q14_sha_7_sim + q14_sha_8_sim + q14_sha_9_sim + q14_sha_10_sim + q14_sha_11_sim + q14_sha_12_sim + q14_sha_13_sim + q14_sha_14_sim)
+```
+
+#Reformatting
+#Change column types: columns containing only numbers become "integer", columns containing only letters or numbers-and-letters become "character", except if they have "date" in the title, in which case they become "POSIXct"
+```{r}
+# Function to change column types based on data and column names
+ change_column_types <- function(df) {
+  for (col_name in colnames(df)) {
+    col_data <- df[[col_name]]
+
+    # Skip columns already numeric or POSIXct
+    if (is.numeric(col_data) || inherits(col_data, "POSIXct")) next
+
+    # Trim character values
+    if (is.character(col_data)) {
+      trimmed <- trimws(col_data)
+      numeric_check <- suppressWarnings(!is.na(as.numeric(trimmed)))
+      
+      if (all(numeric_check | is.na(trimmed))) {
+        df[[col_name]] <- as.integer(trimmed)
+      } else {
+        df[[col_name]] <- trimmed
+      }
+    }
+  }
+
+  # Convert date columns
+  for (col_name in colnames(df)) {
+    if (grepl("_date_", col_name)) {
+      df[[col_name]] <- as.POSIXct(df[[col_name]], format = "%m/%d/%Y")
+    }
+  }
+
+  return(df)
+}
+baseline2 <- change_column_types(baseline2)
+```
+
+#Fix a typo
+```{r}
+baseline2 <- baseline2 %>%
+  rename(total_household_income = total_houselhold_income)
+```
+
+#The baseline data are now ready to be merged with the EMA data. Before merging the baseline and EMA data though, the EMA data must be prepared. Code for pre-merge actions on EMA data are performed in the subsequent Rmds (2_Part2beepedPreproc, 3_Part6beepedPreproc).
+
+#First Glimpse for Baseline Data - included in this RMD as for a "quick and efficient overview of the dataset." The code is not "chunked" because it takes a long time to run and is optional.
+
+#View structure of data (Examine variable types and dataset dimensions)
+glimpse(baseline2)
+#View descriptive statistics (For each variable, examine % missing, mean, sd, frequencies by quartile, and histogram)
+skim(baseline2)
+
+#Temporary until git established; Save as rds file.
+```{r}
+saveRDS(baseline2, here::here("output", "baseline2.rds"))
+```
+
+#References
+#Carver, C. S., & White, T. L. (1994). Behavioral inhibition, behavioral activation, and affective responses to impending reward and punishment: The BIS/BAS scales. Journal of Personality and Social Psychology, 67(2), 319–333.
+#Fagerström, K. (2011). Determinants of tobacco use and renaming the FTND to the Fagerström Test for Cigarette Dependence. Nicotine & Tobacco Research, 14(1), 75–78
+#Heatherton, T. F., Kozlowski, L. T., Frecker, R. C., & FAGERSTROM, K. O. (1991). The Fagerström test for nicotine dependence: a revision of the Fagerstrom Tolerance Questionnaire. British journal of addiction, 86(9), 1119-1127.
+#Snaith, R. P., Hamilton, M., Morley, S., Humayan, A., Hargreaves, D., & Trigwell, P. (1995). A scale for the assessment of hedonic tone: The Snaith–Hamilton Pleasure Scale. The British Journal of Psychiatry, 167(1), 99–103.
+#Thompson, E. R. (2007). Development and validation of an internationally reliable short-form of the positive and negative affect schedule (PANAS). Journal of cross-cultural psychology, 38(2), 227-242.
+#Watson, D., Clark, L. A., & Tellegen, A. (1988). Development and validation of brief measures of positive and negative affect: The PANAS scales. Journal of Personality and Social Psychology, 54(6), 1063–1070.

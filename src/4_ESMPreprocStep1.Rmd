@@ -1,0 +1,401 @@
+---
+title: "ESM Preprocessing Step 1"
+author: "DVAL Lab"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+# Overview
+
+This R Markdown file is based on Revol et al. (2024) and their step-by-step guidelines for preprocessing ESM data: [https://preprocess.esmtools.com](https://preprocess.esmtools.com). It includes code adapted from "Step 1: Import data and preliminary preprocessing".
+
+---
+
+```{r setup, message=FALSE, warning=FALSE, results='hide', include=FALSE}
+# Load required packages
+library(here)
+library(dplyr)
+library(readr) 
+library(readxl) 
+library(janitor)
+library(psych)
+library(skimr)
+library(Hmisc)
+library(knitr)
+library(esmtools)
+library(naniar)
+library(visdat)
+library(ggplot2)
+library(tidyr)
+library(lubridate)
+
+# Define paths to intermediate files
+part6_path <- here("output", "part6beeped.rds")
+part2_path <- here("output", "part2beeped.rds")
+baseline_path <- here("output", "baseline2.rds")
+```
+
+# Load and merge EMA Data
+```{r}
+part6beeped_1 <- readRDS(part6_path) %>%
+  mutate(source = "part6")
+
+part2beeped_1 <- readRDS(part2_path) %>%
+  mutate(source = "part2")
+
+merged_ema <- bind_rows(part6beeped_1, part2beeped_1)
+```
+
+#Load and select Baseline Covariates
+```{r}
+baseline <- readRDS(baseline_path) %>%
+  dplyr::select(
+    participant_id,
+    race,
+    age,
+    gender,
+    total_household_income,
+    bank_balance,
+    ftnd_sum,
+    cigsperday
+  )
+```
+
+#Merge EMA and baseline data into one dataframe called 'd'.
+```{r}
+d <- merge(merged_ema, baseline, by = "participant_id")
+```
+
+#The baseline and EMA data are now combined in the dataframe called 'd' and organized based on their variable type.
+
+#First Glimpse (Merged (Baseline and EMA) Data)
+View(d)
+#skim(d)
+
+#Reformatting: step skipped here because it was completed in previous RMDs
+#Duplication
+```{r}
+#Duplicated rows? (none detected)
+sum(duplicated(d))
+#Duplicated answers? (none detected)
+d %>%
+  group_by(participant_id, session_id, study_day, survey_status, esn, survey_name, survey_action, survey_type,
+                      lat, lng, timezone, happy, dissatisfied, irritable, relaxed, depressed, mentally_exhausted, 
+                      elated, stressed, difficulty_concentrating, health, mood, energy_level, smoke, motivated,
+                      confident, pay, easy_difficult, before_survey, pleasant, neutral, unpleasant, prior_mood,
+                      pleasurable_activities, stressful_occurrence, how_stressful, location, current_location, who_been_with, 
+                      smoking_now, physically_active, smoked_since_last_survey, consumed, upcoming_activities) %>%
+                      filter(n()>1)
+```
+
+#Renaming and relabeling: step skipped here because it was completed in previous RMDs
+#Flag (in)valid observations
+```{r}
+#Identify the number of started, but incomplete, surveys (0 = number of incomplete surveys across participants)
+d$subm_time_valid = as.numeric(!is.na(d$time_complete))
+table(d$subm_time_valid)
+#Another option would be to examine the values for 'survey_status' across participants and view the overall compliance rate per participant.
+
+survey_status_counts <- d %>%
+  group_by(participant_id, survey_status) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  pivot_wider(names_from = survey_status, values_from = count, values_fill = 0) %>%
+  mutate(
+    total_surveys = rowSums(across(-participant_id)),  # Sum all survey statuses
+    incomplete_surveys = rowSums(across(any_of(c("Timed Out", "Skipped", "Interrupted")))),  
+    compliance_rate = 1 - (incomplete_surveys / total_surveys)  # Percentage of completed
+  ) 
+
+print(survey_status_counts)
+```
+#Interpretation of the above step: Meta analysis (Jones et al, 2018) suggests using a cutoff of 70% compliance when selecting participants to include. However, we have options for accounting for high missingness within-person, so no exclusions have been made as of 5.19.25.
+
+#Compute the number of items answered (no missing values) in each row among the variables of interest. Here, variables of interest reflect those central to the main paper for the DVAL study, in which easy_difficult and mood are the focus. (0 = zero non-missing values in selected columns, 1 = one non-missing value in selected columns, 2 = two non-missing values in selected columns, 3 = three non-missing values in selected columns). 
+```{r}
+d$var_of_interest_valid = rowSums(!is.na(dplyr::select(d, easy_difficult, mood, pleasant)))
+table(d$var_of_interest_valid)
+```
+#Specify that a row must have non-missing data in all (2) selected columns in order to be considered valid. (This way we can include some surveys that were not technically submitted but still have data for our variables of interest). 
+```{r}
+threshold = 3
+d$valid = as.numeric(d$var_of_interest_valid >= threshold)
+table(d$valid)
+```
+#(Lots more that can be done with validity, this is currently what defines DVAL EMA validity as of 5.19.25)
+
+#First missingness analysis of EMA items
+#This section explores and handles missing values. Reformatting of variables has already occurred in the premerge RMDs, which took care of some of the issues that would have been captured in this section, such as missing values erroneously being represented by the text "NA". 
+
+#This is an opportunity to check that the values are accurately coded. For R, missing values should be represented by "na".*********
+```{r}
+#describe(d)
+```
+
+#First, a visualization of the missingness in the dataset, where the y-axis represents observations and the x-axis the EMA variables in the dataset (note: the dataframe used here includes subsets of beeped EMA variables, because the combined dataset was too large).  
+
+```{r} 
+
+#Here, the beeped data are broken down into part2 (days 1 - 3) and part6 (days 4 - 10). 
+part2 <- d %>%  
+  filter(study_day >= 1 & study_day <= 3) 
+part6 <- d %>%  
+  filter(study_day >= 4 & study_day <= 10) 
+``` 
+
+```{r}
+#Here, the beeped data are broken down into groups within part2 and part6.
+##Define variable groups
+current_state_vars <- c("happy", "dissatisfied", "irritable", "relaxed", "depressed", 
+                        "mentally_exhausted", "elated", "stressed", "difficulty_concentrating", 
+                        "health", "mood", "energy_level")
+
+current_smok_vars <- c("smoke", "motivated", "confident", "pay", "easy_difficult")
+
+prior_eventapp_vars <- c("before_survey", "pleasant", "neutral", "unpleasant")
+
+other_eventapp_vars <- c("prior_mood", "pleasurable_activities", "stressful_occurrence", 
+                         "how_stressful", "upcoming_activities")
+
+context_vars <- c("location", "current_location", "smoking_now")
+
+lagged_behavior_vars <- c("who_been_with", "physically_active", "smoked_since_last_survey", 
+                          "consumed")
+```
+
+#Examine groups 
+```{r}
+current_state <- d %>% dplyr::select(participant_id, study_day, all_of(current_state_vars))
+vis_miss(current_state) + ggtitle("Current_state_vars missingness")
+
+current_smok <- d %>% dplyr::select(participant_id, study_day, all_of(current_smok_vars))
+vis_miss(current_smok) + ggtitle("Missingness in part2 - current_smok_vars")
+
+prior_eventapp <- d %>% dplyr::select(participant_id, study_day, all_of(prior_eventapp_vars))
+vis_miss(prior_eventapp) + ggtitle("Missingness in part2 - prior_eventapp_vars")
+
+other_eventapp <- d %>% dplyr::select(participant_id, study_day, all_of(other_eventapp_vars))
+vis_miss(other_eventapp) + ggtitle("Missingness in part2 - other_eventapp_vars")
+
+context <- d %>% dplyr::select(participant_id, study_day, all_of(context_vars))
+vis_miss(part2_context) + ggtitle("Missingness in part2 - context_vars")
+
+lagged_behavior <- d %>% dplyr::select(participant_id, study_day, all_of(lagged_behavior_vars))
+vis_miss(lagged_behavior) + ggtitle("Missingness in part2 - lagged_behavior_vars")
+```
+#Next we can compute the number of missing values (or their percentage) per variable. 
+```{r}
+miss_var_summary(part2)
+miss_var_summary(part6)
+miss_var_summary(d)
+```
+#At this point, it would be helpful to be able to determine the numbers of missing values per observation and determine whether they are systematic or random.
+#Here, the x-axis is the observation number and the y-axis represents the number of missing values within the variables of each observation. 
+```{r}
+gg_miss_case(part2)
+gg_miss_case(part6)
+gg_miss_case(d)
+```
+#From Revol et al, (2024)"We can explore missing values grouping by participants. However, it is a more complex exploration as missing values are now grouped in observations/variables which we nest within participants. We propose three methods:
+#1. Occurrence of missing values: if observations contain either no or only missing values (in self-report items), we can use a variable to account for the number of missed beeps by the participant.
+```{r fig.width=12, fig.height=6}
+#easy_difficult
+d %>%
+  group_by(participant_id) %>%
+  summarise(easy_difficult_miss = sum(is.na(easy_difficult))) %>%
+  ggplot(aes(x=factor(participant_id), y=easy_difficult_miss)) +
+  geom_col() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + # Rotate x-axis labels if needed
+  theme(plot.margin = unit(c(1, 1, 1, 1), "cm")) # Add extra margins if desired
+# before_survey
+d %>%
+  group_by(participant_id) %>%
+  summarise(before_survey_miss = sum(is.na(before_survey))) %>%
+  ggplot(aes(x = factor(participant_id), y = before_survey_miss)) +
+  geom_col() +
+  theme(
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, margin = margin(t = 5)), # Adds spacing
+    plot.margin = unit(c(1, 1, 2, 1), "cm")  # Increases bottom margin
+  )
+# neutral
+d %>%
+  group_by(participant_id) %>%
+  summarise(neutral_miss = sum(is.na(neutral))) %>%
+  ggplot(aes(x=factor(participant_id), y=neutral_miss)) +
+  geom_col() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  theme(plot.margin = unit(c(1, 1, 1, 1), "cm"))
+# mood
+d %>%
+  group_by(participant_id) %>%
+  summarise(mood_miss = sum(is.na(mood))) %>%
+  ggplot(aes(x=factor(participant_id), y=mood_miss)) +
+  geom_col() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  theme(plot.margin = unit(c(1, 1, 1, 1), "cm"))
+# pleasant
+d %>%
+  group_by(participant_id) %>%
+  summarise(pleasant_miss = sum(is.na(pleasant))) %>%
+  ggplot(aes(x=factor(participant_id), y=pleasant_miss)) +
+  geom_col() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  theme(plot.margin = unit(c(1, 1, 1, 1), "cm"))
+# unpleasant
+d %>%
+  group_by(participant_id) %>%
+  summarise(unpleasant_miss = sum(is.na(unpleasant))) %>%
+  ggplot(aes(x=factor(participant_id), y=unpleasant_miss)) +
+  geom_col() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  theme(plot.margin = unit(c(1, 1, 1, 1), "cm"))
+```
+#Sort dataframe by participant_id (numeric) order
+```{r}
+d <- d %>% arrange(participant_id)
+```
+
+#2. Occurrence of missing values within variables: we can investigate if missingness between variables is identical across participants. Hence, we want to visualize the occurrence of missing values within each variable for each participant. It is particularly relevant if participants were allowed to answer only part of the questionnaires.******
+```{r fig.width=6, fig.height=10}
+d %>%
+  group_by(participant_id) %>%
+  summarise(across(before_survey:unpleasant, ~ sum(is.na(.)), .names = "miss_{.col}")) %>% 
+  pivot_longer(cols = -participant_id, names_to = "var", values_to = "occ") %>%
+  ggplot(aes(x = factor(participant_id), y = occ, fill = var)) +
+    geom_col(position = "identity") +
+    coord_flip() +
+    theme(axis.text.y = element_text(size = 6, margin = margin(r = 5)))  # Adjust right margin
+```
+
+#3.Occurrence of the number of missing values per row/observation: we investigate how the number of missing values per row/observation occurs within participants. It is particularly relevant if participants were allowed to answer only part of the questionnaires."
+```{r fig.width=12, fig.height=6}
+# Count missing values per row
+d <- d %>%
+  mutate(miss_gap = rowSums(is.na(.)))
+
+n_ <- nrow(d)
+
+# Limit to top 50 participants by number of rows
+top_ids <- d %>%
+  count(participant_id) %>%
+  top_n(50, n) %>%
+  pull(participant_id)
+
+# Define numeric order for those participant IDs
+top_ids_ordered <- top_ids[order(as.numeric(as.character(top_ids)))]
+
+# Summarize and plot
+d %>%
+  filter(participant_id %in% top_ids) %>%
+  group_by(miss_gap, participant_id) %>%
+  summarise(
+    n = n(),
+    perc_n = n / n_,
+    .groups = "drop"
+  ) %>%
+  ggplot(aes(x = factor(participant_id, levels = top_ids_ordered), 
+             y = n, fill = factor(miss_gap))) +
+    geom_col(position = "identity") +
+    coord_flip() +
+    theme_minimal() +
+    theme(
+      axis.text.y = element_text(size = 7),
+      axis.title.y = element_blank(),
+      plot.title = element_text(hjust = 0.5),
+      legend.position = "bottom",
+      legend.text = element_text(size = 8)
+    ) +
+    guides(fill = guide_legend(nrow = 2, byrow = TRUE)) +
+    labs(
+      x = "Participant ID",
+      y = "Number of Observations",
+      fill = "Missing per Row"
+    ) +
+    ggtitle("Distribution of Missing Data by Participant and Row")
+```
+
+
+#Correlates. The below code helps to identify potential dependencies or relationships in missing values between variables, and investigate variables potentially influencing missingness (note: in the DVAL main study, this would be relevant for before_survey, pleasant, and unpleasant).
+#From Revol et al, (2024): "The ‘gg_miss_upset()’ function enables us to visualize the overlap and combinations of missing values across different variables. The lower part of the plot showcases the distinct patterns of missingness between variables, while the upper plot depicts the occurrences of each of these patterns. "
+
+```{r}
+gg_miss_upset(d)
+```
+
+#Create obsno variable that indicates the serial order of the beeps for each participant. 
+```{r}
+#Generate a complete skeleton for expected beeps
+# Define number of expected study days and beeps per day
+n_days <- 10
+n_beeps <- 6
+
+# Get all participant IDs
+participant_ids <- unique(d$participant_id)
+
+# Create the skeleton of expected beeps
+skeleton <- expand.grid(
+  participant_id = participant_ids,
+  study_day = 1:n_days,
+  beep_in_day = 1:n_beeps
+) %>%
+  arrange(participant_id, study_day, beep_in_day) %>%
+  group_by(participant_id) %>%
+  mutate(obsno = row_number()) %>%
+  ungroup()
+
+#Merge original dataset into skeleton
+# Add row number per day in the original data (for merging)
+d <- d %>%
+  arrange(participant_id, study_day, completion_time) %>%
+  group_by(participant_id, study_day) %>%
+  mutate(beep_in_day = row_number()) %>%
+  ungroup()
+d_full <- skeleton %>%
+  left_join(d, by = c("participant_id", "study_day", "beep_in_day"))
+#Ensure the obsno variable was accurately created (Key: that missing observations remain in their serial order)
+d_full %>%
+  dplyr::select(participant_id, completion_time, study_day, obsno) %>%
+  arrange(participant_id, obsno) %>%
+  print(n = 100)
+```
+
+#Continuous time variables. This calculates how much time has passed since the submission of the participant's first survey (6/19/25: for DVAL main study, we'll want to split this between part2 beeped and part6 beeped)
+```{r}
+unit = "mins"
+interval_unit = 60
+
+d_full <- d_full %>%
+  group_by(participant_id) %>%
+  # Find the time_complete value where obsno == 1 for each participant
+  mutate(start_time = time_complete[obsno == 1][1]) %>%  # [1] in case of multiple obsno==1 (just take the first)
+  ungroup() %>%
+  # Calculate continuous time difference relative to that start_time
+  mutate(continuoustime = as.numeric(difftime(time_complete, start_time, units = unit)))
+```
+
+
+#Check variable coherence: step skipped because coherence was observed in missingness analysis
+#Dataframe format: step skipped because data formats were manipulated earlier in our preprocessing pathway
+#Branching items 
+#Participants' answer to the item, 'before_survey' determines which follow-up event rating variable gets sent subsequently: 'unpleasant', 'neutral', or 'pleasant'. 
+#We want to ensure that participants' subsequent responses align with the structure of the survey. 
+```{r}
+d_full %>%
+  mutate(pleasant_NA= !is.na(pleasant),
+         unpleasant_NA= !is.na(unpleasant),
+         neutral_NA= !is.na(neutral)) %>%  
+  group_by(before_survey, pleasant_NA, unpleasant_NA, neutral_NA) %>%
+  summarise(n())
+```
+# Interpretation of Branching step: it appears that the pattern of missingness aligns with the survey scheme. For example, 'It was generally neutral' is accompanied by non-missing data for the 'neutral' variable. This pattern exists for 'pleasant' and 'unpleasant' as well.
+
+#Save new merged data (all EMA and baseline data).
+```{r}
+saveRDS(d_full, here("output", "EMA_and_baseline1.rds"))
+```
+
+#References
+#Jones, A., Remmerswaal, D., Verveer, I., Robinson, E., Franken, I. H., Wen, C. K. F., & Field, M. (2019). Compliance with ecological momentary assessment protocols in substance users: A meta‐analysis. Addiction, 114(4), 609-619.
+
+#Revol, J., Carlier, C., Lafit, G., Verhees, M., Sels, L., & Ceulemans, E. (2024). Preprocessing ESM data: a step-by-step framework, tutorial website, R package, and reporting templates.
+
+
