@@ -76,14 +76,9 @@ part2beeped <- read_csv(
     session_id = as.numeric(session_id)
   ) %>%
 mutate(
-  across(c(init_time, completion_time), 
-         ~ lubridate::with_tz(
-             as.POSIXct(., 
-                        format = "%Y-%m-%d %H:%M:%OS",
-                        tz = "America/New_York"),
-             tzone = "UTC"
-           ))
-)
+  init_time       = with_tz(init_time, tzone = "UTC"),
+    completion_time = with_tz(completion_time, tzone = "UTC")
+  )
 
 # Quick glimpse
 glimpse(part2beeped)

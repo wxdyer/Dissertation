@@ -2,12 +2,36 @@
 title: "ESM Preprocessing Step 1"
 author: "DVAL Lab"
 date: "`r Sys.Date()`"
-output: html_document
+output: 
+  html_document:
+      toc: true
+      number_sections: false
+      toc_float: true
+      toc_depth: 2
 ---
+
+<!-- Javascript code to zoom in and out in the plots. -->s
+<!-- Code from Radovan Miletić: https://stackoverflow.com/questions/56361986/zoom-function-in-rmarkdown-html-plot -->
+<script src = "https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+<script type="text/javascript">
+$(document).ready(function() {
+    $('body').prepend('<div class=\"zoomDiv\"><img src=\"\" class=\"zoomImg\"></div>');
+    // onClick function for all plots (img's)
+    $('img:not(.zoomImg)').click(function() {
+    $('.zoomImg').attr('src', $(this).attr('src')).css({width: '100%'});
+    $('.zoomDiv').css({opacity: '1', width: 'auto', border: '1px solid white', borderRadius: '5px', position: 'fixed', top: '50%', left: '50%', marginRight: '-50%', transform: 'translate(-50%, -50%)', boxShadow: '0px 0px 50px #888888', zIndex: '50', overflow: 'auto', maxHeight: '100%'});
+    });
+    // onClick function for zoomImg
+    $('img.zoomImg').click(function() {
+    $('.zoomDiv').css({opacity: '0', width: '0%'}); 
+    });
+});
+</script>
+
 
 # Overview
 
-This R Markdown file is based on Revol et al. (2024) and their step-by-step guidelines for preprocessing ESM data: [https://preprocess.esmtools.com](https://preprocess.esmtools.com). It includes code adapted from "Step 1: Import data and preliminary preprocessing".
+This R Markdown file is based on Revol et al. (2024) and their step-by-step guidelines for preprocessing ESM data: [https://preprocess.esmtools.com](https://preprocess.esmtools.com). It includes code adapted from "Steps 1 - 5.
 
 ---
 
@@ -45,39 +69,67 @@ This section is dedicated to the first look at the data, the merging of data sou
 
 Import the data: 
 ```{r}
-#Define paths to intermediate file
+#Define path to intermediate file
 
 part2_path <- here("output", "part2beeped.rds")
 
-# Read baseline and part2 EMA data
-part2 <- readRDS(part2_path)
+# Read Part 2 EMA data
+df <- readRDS(part2_path)
+```
+
+Imported dataset meta-info:
+```{r}
+
+
+# Basic info
+cat("## Path      : in-memory dataframe\n")
+cat("## Extension : RDS\n")
+cat("## Size      :", format(object.size(df), units = "auto"), "\n")
+
+# Dimensions
+cat("## ncol      :", ncol(df), "\n")
+cat("## nrow      :", nrow(df), "\n")
+
+# Number of participants
+id_var <- "participant_id"
+n_participants <- n_distinct(df[[id_var]])
+cat("## Number participants :", n_participants, "\n")
+
+# Average number of observations per participant
+avg_obs <- nrow(df) / n_participants
+cat("## Average number obs :", round(avg_obs, 1), "\n")
+
+# Time period
+time_var <- "init_time"
+time_min <- min(df[[time_var]], na.rm = TRUE)
+time_max <- max(df[[time_var]], na.rm = TRUE)
+cat("## Period : from", format(time_min, "%Y-%m-%d %H:%M:%S"), 
+    "to", format(time_max, "%Y-%m-%d %H:%M:%S"), "\n")
+
+# Variable names
+cat("## Variables :", paste(names(df), collapse = ", "), "\n")
+
 ```
 
 
+## Duplication
+No issues detected
 ```{r}
-# Get meta-information for Part 2 EMA
-dataInfo(
-  part2,
-  idvar   = "participant_id",
-  timevar = "init_time"
-)
 
-```
+**Look for duplicated rows:** the dataframe does not have duplicated rows.
+cat("Duplicated rows:", sum(duplicated(df)), "\n")
 
+# Check for duplicated answers based on key variables
+answer_cols <- c("participant_id", "mood", "smoke", "before_survey", 
+                 "unpleasant", "prior_mood", "smoked_since_last_survey", 
+                 "pleasant", "session_id", "completion_time", "init_time")
 
-#Duplication
-```{r}
-#Duplicated rows? (none detected)
-sum(duplicated(d))
-#Duplicated answers? (none detected)
-d %>%
-  group_by(participant_id, session_id, study_day, survey_status, esn, survey_name, survey_action, survey_type,
-                      lat, lng, timezone, happy, dissatisfied, irritable, relaxed, depressed, mentally_exhausted, 
-                      elated, stressed, difficulty_concentrating, health, mood, energy_level, smoke, motivated,
-                      confident, pay, easy_difficult, before_survey, pleasant, neutral, unpleasant, prior_mood,
-                      pleasurable_activities, stressful_occurrence, how_stressful, location, current_location, who_been_with, 
-                      smoking_now, physically_active, smoked_since_last_survey, consumed, upcoming_activities) %>%
-                      filter(n()>1)
+dup_answers <- df %>%
+  group_by(across(all_of(answer_cols))) %>%
+  filter(n() > 1) %>%
+  ungroup()
+
+cat("Duplicated answer sets:", nrow(dup_answers), "\n")
 ```
 
 #Renaming and relabeling: step skipped here because it was completed in previous RMDs
