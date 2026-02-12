@@ -1,8 +1,15 @@
-.Rproj.user
+
+
+# R session files
 .Rhistory
 .RData
-.Ruserdata
-.DS_Store
--wpc.Rhistory
+.Rproj.user/
+.Rproj.user
 Dissertation_Git.Rproj
+
+# Catch machine-specific suffixes for R history
+*-wpc-*.Rhistory
+wpc-*.Rhistory
+*-wpc-*.RData
+wpc-*.RData
 
