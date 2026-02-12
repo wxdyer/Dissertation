@@ -12,4 +12,6 @@ Dissertation_Git.Rproj
 -wpc*.Rhistory
 *-wpc-*.RData
 wpc-*.RData
-
+*-wpc*.Rmd
+*-wpc-*.Rmd
+*wpc-*.Rmd
