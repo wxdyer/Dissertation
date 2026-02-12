@@ -9,7 +9,7 @@ Dissertation_Git.Rproj
 
 # Catch machine-specific suffixes for R history
 *-wpc-*.Rhistory
-wpc-*.Rhistory
+-wpc*.Rhistory
 *-wpc-*.RData
 wpc-*.RData
 
