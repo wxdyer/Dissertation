@@ -1,6 +1,7 @@
 ---
-title: "ESM Preprocessing (Revol et al. 2024) Steps 1 - 5"
-author: "wxder"
+title: "EMA Preprocessing (Revol et. al. 2024 Steps 1 - 4)"
+author:
+  - name: Walter G. Dyer, wdyer@psu.edu, Penn State University
 date: "`r Sys.Date()`"
 output: 
   html_document:
@@ -87,7 +88,7 @@ dataInfo(file_path = part2_path,
 
 Below are several steps that will facilitate the application of Revol et al's preprocessing steps. Specifically, only variables and participants relevant to the study will be included in the preprocessing steps, so the data must be subset. Additionally, how to define missing values is specified, variables are formatted to their respective types (e.g., numeric, character), and formatting issues related to cases where participants opted out of a survey are dealt with below. 
 
-`r txt('esm-mod','Modification',"data are subsetted to include only participants who completed Part2 (3 days of EMA data collection).")` 
+## Modification text:data are subsetted to include only participants who completed Part2 (3 days of EMA data collection
 ```{r}
 # Define subset of participants who completed Part2 (3 days of EMA data collection)
 subset_ids <- c(
@@ -101,10 +102,23 @@ subset_ids <- c(
 )
 ```
 
-`r txt('esm-mod','Modification',"EMA variables relevant to the study are extracted, and missingness is standardized across variables.")` 
+## Issue text: The raw dataset is quite large and includes several variables irrelevant to this study. Additionally, missinginess is inconsistently coded upon data import.
+## Modification text: EMA variables relevant to the study are extracted, and missingness is standardized across variables.
+
+## Issue text: The variable smoked_since_last_survey gave participants the option to select '6+' which, while useful for other analyses, prevents us from formatting the variable as numeric.
+## Modification text: The chunk below also converts '6+' to 6 for the variable smoked_since_last_survey.
+
+## Issue text: Instances where participants opted out were reported by the literal text 'opted out' in the raw dataset, making the data incompatible with the command to format the variable as numeric.
+## Modification text: In order to maintain these data but in a format compatible with numeric formatting, a variable to track opted out instances is created to check whether further actions to account for these cases must be taken.
+
+## Issue text: Variables are all in character format upon import.
+## Modification text: The below chunk also formats numeric variables as numeric.")`
+
+Note: the below code also includes counts of missingness before and after the data modifications. No data were lost during the modification process.
+
 ```{r}
-# Define missing values for EMA variables to be used study analyses
-part2beeped <- read_csv(
+#Read in CSV 
+part2beeped_raw <- read_csv(
   part2_path,
   na = c("-99", "__NA__", "NA", ""),
   col_types = cols(.default = col_character()),
@@ -123,37 +137,53 @@ part2beeped <- read_csv(
   )
 ) %>%
   filter(as.numeric(participant_id) %in% subset_ids)
-```
 
-`r txt('esm-mod','Modification',"preparing variables for numeric formatting by addressing issues leading to variables being formatted as character. The variable smoked_since_last_survey gave participants the option to select "6+" which, while useful for other analyses, prevents us from formatting the variable as numeric. The chunk below convert's "6+" to 6 for the variable smoked_since_last_survey.")`
+#
+missing_before <- part2beeped_raw %>%
+  summarise(across(everything(), ~sum(is.na(.)))) %>%
+  tidyr::pivot_longer(everything(), names_to = "variable", values_to = "missing_before")
 
-`r txt('esm-mod','Modification',"the below chunk also addresses an issue regarding data capturing instances where participants 'opted out'. In order to maintain these data but in a format compatible with numeric formatting, instances of 'opted out' are recoded to 999.")` 
-
-`r txt('esm-mod','Modification',"the below chunk also formats numeric variables as numeric.")`
-```{r}
-part2beeped <- part2beeped %>%
-  filter(as.numeric(participant_id) %in% subset_ids) %>%
+#Apply opted-out flags and numeric conversion
+part2beeped <- part2beeped_raw %>%
   mutate(
+    # Create opted-out flags
+    smoked_since_last_survey_opted_out = smoked_since_last_survey == "opted out",
+    mood_opted_out = mood == "opted out",
+    smoke_opted_out = smoke == "opted out",
+    unpleasant_opted_out = unpleasant == "opted out",
+    pleasant_opted_out = pleasant == "opted out",
+    prior_mood_opted_out = prior_mood == "opted out",
+    participant_id_opted_out = participant_id == "opted out",
+    session_id_opted_out = session_id == "opted out",
+    
+    # Convert variables to numeric
     smoked_since_last_survey = case_when(
-      smoked_since_last_survey == "opted out" ~ 999,
       smoked_since_last_survey == "6+" ~ 6,
+      smoked_since_last_survey == "opted out" ~ NA_real_,
       TRUE ~ as.numeric(smoked_since_last_survey)
     ),
-    mood = as.numeric(ifelse(mood == "opted out", 999, mood)),
-    smoke = as.numeric(ifelse(smoke == "opted out", 999, smoke)),
-    before_survey = as.numeric(ifelse(before_survey %in% c("opted out", ""), 999, before_survey)),
-    unpleasant = as.numeric(ifelse(unpleasant == "opted out", 999, unpleasant)),
-    pleasant = as.numeric(ifelse(pleasant == "opted out", 999, pleasant)),
-    prior_mood = as.numeric(ifelse(prior_mood == "opted out", 999, prior_mood)),
-    participant_id = as.numeric(ifelse(participant_id == "opted out", 999, participant_id)),
-    session_id = as.numeric(ifelse(session_id == "opted out", 999, session_id))
+    mood = ifelse(mood == "opted out", NA, as.numeric(mood)),
+    smoke = ifelse(smoke == "opted out", NA, as.numeric(smoke)),
+    unpleasant = ifelse(unpleasant == "opted out", NA, as.numeric(unpleasant)),
+    pleasant = ifelse(pleasant == "opted out", NA, as.numeric(pleasant)),
+    prior_mood = ifelse(prior_mood == "opted out", NA, as.numeric(prior_mood)),
+    participant_id = ifelse(participant_id == "opted out", NA, as.numeric(participant_id)),
+    session_id = ifelse(session_id == "opted out", NA, as.numeric(session_id))
+    # before_survey left as character for branching
   )
-```
-#Stopped here thursday 2.11!
 
-`r txt('esm-mod','Modification',"run the 'clean_names' function in the janitor package, so that variable names with hyphens become variable names with underscores and all text in variable names becomes lowercase.")`
-```{r}
-part2beeped <- clean_names(part2beeped)
+#Record missingness after conversion ---
+missing_after <- part2beeped %>%
+  summarise(across(everything(), ~sum(is.na(.)))) %>%
+  tidyr::pivot_longer(everything(), names_to = "variable", values_to = "missing_after")
+
+#Combine before/after into one table ---
+missing_summary <- missing_before %>%
+  left_join(missing_after, by = "variable") %>%
+  arrange(variable)
+
+# View the summary
+missing_summary
 ```
 
 `r txt('esm-mod','Modification',"format time variables as POSIXct.")`
@@ -162,7 +192,6 @@ part2beeped <- part2beeped %>%
   mutate(init_time = as.POSIXct(init_time, tz = "UTC"),
          completion_time = as.POSIXct(completion_time, tz = "UTC"))
 ```
-
 
 Cleaned dataset meta-info:
 ```{r}
@@ -200,7 +229,6 @@ The EMA data are now prepared for Revol et. al.'s preprocessing workflow.
 
 The following chunk helps to have a first insight on what the dataset looks like.
 
-`r button(text = "Description")`
 ```{r}
 dim(part2beeped)
 ```
@@ -219,14 +247,11 @@ skim(part2beeped)
 ```{r}
 table(part2beeped$before_survey, useNA="ifany")
 ```
-`r endbutton()`
 
-#Stopped 2.11.26
 
 ## Duplication
 No issues detected.
 
-`r button(text = "Supplementary")`
 **Look for duplicated rows:** the dataframe does not have duplicated rows.
 ```{r}
 sum(duplicated(part2beeped))
@@ -242,13 +267,14 @@ part2beeped[!is.na(part2beeped$init_time),] %>% # Select answered observations
     filter(n > 1) %>% arrange(desc(n)) %>% as.data.frame()
 ```
 
+
 ```{r}
 # Check for duplicated answers based on key variables
 answer_cols <- c("participant_id", "mood", "smoke", "before_survey", 
                  "unpleasant", "prior_mood", "smoked_since_last_survey", 
                  "pleasant", "session_id", "completion_time", "init_time")
 
-dup_answers <- df %>%
+dup_answers <- part2beeped %>%
   group_by(across(all_of(answer_cols))) %>%
   filter(n() > 1) %>%
   ungroup()
@@ -256,7 +282,43 @@ dup_answers <- df %>%
 cat("Duplicated answer sets:", nrow(dup_answers), "\n")
 ```
 
+## Branching items
+
+**Branching items are consistent:**
+
+- when the participant chooses 'It was generally pleasant' for the variable 'before_survey', the variable  'pleasant' is displayed to the participant.
+- when the participant chooses 'It was generally unpleasant' for the variable 'before_survey', the variable  'unpleasant' is displayed to the participant.
+- n of observations for which both 'unpleasant' and 'pleasant' are missing (N=648) correspond to the n of observations for which participants reported 'It was generally neutral' (N=549; above) plus the n missinenss for the 'before_survey' variable (N=99; above), indicating no problems occurred at this step.
+
+```{r}
+# Count the number of observations for each before_survey category
+branch_check <- part2beeped %>%
+  mutate(
+    # Flag cases where both numeric branching variables are missing
+    both_missing = is.na(pleasant) & is.na(unpleasant)
+  ) %>%
+  summarise(
+    n_pleasant_displayed = sum(!is.na(pleasant) & before_survey == "It was generally pleasant"),
+    n_unpleasant_displayed = sum(!is.na(unpleasant) & before_survey == "It was generally unpleasant"),
+    n_neutral_branch = sum(both_missing & before_survey == "It was generally neutral"),
+    n_both_missing_total = sum(both_missing),
+    total_obs = n()
+  )
+
+branch_check
+```
+# Check variable coherence
+```{r}
+# **Consistency of time-invariant variables.**
+
+vars_consist(part2beeped, "participant_id")
+```
+
+
+
+
 #Renaming and relabeling: step skipped here because it was completed in previous RMDs
+
 #Flag (in)valid observations
 ```{r}
 #Identify the number of started, but incomplete, surveys (0 = number of incomplete surveys across participants)
@@ -565,5 +627,4 @@ saveRDS(d_full, here("output", "EMA_and_baseline1.rds"))
 #Jones, A., Remmerswaal, D., Verveer, I., Robinson, E., Franken, I. H., Wen, C. K. F., & Field, M. (2019). Compliance with ecological momentary assessment protocols in substance users: A meta‐analysis. Addiction, 114(4), 609-619.
 
 #Revol, J., Carlier, C., Lafit, G., Verhees, M., Sels, L., & Ceulemans, E. (2024). Preprocessing ESM data: a step-by-step framework, tutorial website, R package, and reporting templates.
-
 
