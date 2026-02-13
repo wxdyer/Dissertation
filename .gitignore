@@ -6,8 +6,18 @@
 .Rproj.user/
 .Rproj.user
 Dissertation_Git.Rproj
+.DS_Store
 
-# Catch machine-specific suffixes for R history
+
+# RStudio files
+.Rproj.user/
+*.Rproj
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# PC suffixes 
 *-wpc-*.Rhistory
 -wpc*.Rhistory
 *-wpc-*.RData
