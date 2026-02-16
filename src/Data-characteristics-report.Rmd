@@ -1,5 +1,5 @@
 ---
-title: "EMA Preprocessing (Revol et. al. 2024 Steps 1 - 4)"
+title: "Data characteristics report"
 author:
   - name: Walter G. Dyer, wdyer@psu.edu, Penn State University
 date: "`r Sys.Date()`"
@@ -11,7 +11,8 @@ output:
       toc_depth: 2
 ---
 
-<!-- Javascript code to zoom in and out in the plots. -->s
+
+<!-- Javascript code to zoom in and out in the plots. -->
 <!-- Code from Radovan Miletić: https://stackoverflow.com/questions/56361986/zoom-function-in-rmarkdown-html-plot -->
 <script src = "https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
 <script type="text/javascript">
@@ -29,404 +30,88 @@ $(document).ready(function() {
 });
 </script>
 
-
 <!--------- INSTRUCTIONS ----------
-This template would help you to structure and share your preprocessing. 
-It is based on the ESM preprocessing framework described in Revol and al. (under review) 
-In addition, it is associated with an R package, the esmtools package (https://package.esmtools.com), 
-and a website to provide tutorials and R code for each step: https://preprocess.esmtools.com.
+This template would help you to structure and share the characteristic and the characteristics of your preprocessed dataset. 
+It is based on the ESM preprocessing framework described in Revol and al. (under review). 
+In addition, it is associated with an R packages, the esmtools package (package.esmtools.com), 
+and a website to provide tutorials and R code for each step: preprocess.esmtools.com. 
 Please, follow the instructions commented and add descriptions above each chunk you create. 
-This advanced version of the ESM preprocessing report provides instructions on creating an interactive document 
-that mainly use esmtools functions (e.g., buttons) to enhanced user experience. 
 Note that the commented instructions are not displayed in the rendered document. 
 <!--------------------------------->
 
 
-<!-- 
-Txt() and button() css style:
-When importing 'esmtools' packages, it comes with CSS styles for class ('esm-issue', 'esm-inspect', 'esm-mod') used by the txt() and button() functions. 
-Customize them with CSS code in the provided style tag. 
-Modify fonts, colors, etc., as you like (an example is commented).
-In certain cases, you might need to use the '!important' declaration to override the default style definitions.
--->
-<style>
-.esm-issue{
-  /* font-family: Georgia; */
-}
-</style>
 
-<!-- This first chunk define the global settings-->
+<!-- This first chunk define the global settings and hidden variables of the file. -->
 ```{r, include=FALSE}
-# Setup global settings
-# knitr::opts_chunk$set(message=FALSE, warning=FALSE)
+# For scroll bar when the output is longer than what is defined in the chunk:   {r, max.height='600px'}
+options(width = 10000)
+local({
+  hook_output <- knitr::knit_hooks$get('output')
+  knitr::knit_hooks$set(output = function(x, options) {
+    if (!is.null(options$max.height)) options$attr.output <- c(
+      options$attr.output,
+      sprintf('style="max-height: %s;"', options$max.height)
+    )
+    hook_output(x, options)
+  })
+})
+
+knitr::opts_chunk$set(message=FALSE, warning=FALSE) # set multiple global options here
 ```
 
-# Overview and data collection procedure
 
-This R Markdown file is based on Revol et al. (2024)'s step-by-step guidelines for preprocessing ESM data: [https://preprocess.esmtools.com](https://preprocess.esmtools.com). It includes code adapted from Steps 1 - 5, tailored to preprocess EMA data for a secondary analysis of EMA data from the DVAL project (https://osf.io/nb9ct/overview?view_only=4f777b3907bb47aab6387aaa4353285c. In Part 2 of the study, participants received semi-random prompts 6 times throughout the day within predeterimined 2-hr intervals for three consecutive days. 
 
----
-# Load packages
+This template follows the preprocessing framework described in Revol et. al. (2024) and can be found in the R package [esmtools](https://package.esmtools.com). 
 
-Import the packages:
-```{r, message=FALSE, warning=FALSE}
 
-#Data management
+# Import
+
+Import packages
+```{r}
+# For data management:
 library(dplyr)
 library(tidyr)
-library(data.table)
-library(here)
-library(readr)   
 library(readxl)
-library(esmtools) # For button(), txt() functions
+library(here)
 
-# Descriptive statistics
+# For data summary
 library(skimr)
 
-# Missing values inspection
-library(naniar)
-library(visdat)
-
-# Plotting
+# For plots: 
 library(ggplot2)
+library(plotly) 
+library(visdat) # viz missing values
+library(naniar)
+library(GGally)
 
-# Character manipulation
-library(stringr)
-library(janitor)
-
-# Dates and times
+# Manage date
 library(lubridate)
-library(hms)
+
+# For codebook and participants book
+library(DT)
+
+# Tools
+library(esmtools)
+library(stringr)
+
 ```
 
-# Step 1: Import data and preliminary preprocessing
-
-This section is dedicated to the first look at the data, the merging of data sources the first basic preprocessing methods (e.g., duplicates, branching items check), and checking the variable consistency when the data has just been imported.
-
-Import the data: 
+# Read in data
 ```{r}
-#Define path to EMA Part 2 data
-part2_path <- here("data", "DVAL_EMA_Part2_beeped.csv")
+# Load the cleaned study_sample from the RDS file
+study_sample <- readRDS(here("output", "cleaned_study_sample.RDS"))
 ```
 
-Raw dataset meta-info:
+<!-- 
+Session info includes information such as R environment and package versions used, which ensures reproducibility.
+Dataset info includes information that ensures traceability (e.g., date of modification, DOI, article associated) and reproducibility (e.g., checksum, size, dimensions) 
+-->
+Session info:
 ```{r}
-dataInfo(file_path = part2_path, 
-         read_fun = read.csv,
-         idvar = "participant_id", 
-         timevar = "init_time")
-```
-# Import data and prepare for preprocessing steps
-
-Below are several steps that will facilitate the application of Revol et al's preprocessing steps. Specifically, only variables and participants relevant to the study will be included in the preprocessing steps, so the data must be subset. Additionally, how to define missing values is specified, variables are formatted to their respective types (e.g., numeric, character), and formatting issues related to cases where participants opted out of a survey are dealt with below. 
-
-## Modification text:data are subsetted to include only participants who completed Part2 (3 days of EMA data collection
-```{r}
-# Define subset of participants who completed Part2 (3 days of EMA data collection)
-subset_ids <- c(
-  102, 104, 107, 112, 113, 115, 116, 124, 125, 126, 127, 128, 133, 141, 
-  150, 151, 154, 159, 163, 164, 166, 169, 175, 177, 180, 186, 188, 192, 
-  195, 196, 197, 198, 199, 202, 206, 209, 210, 213, 214, 216, 218, 221, 
-  222, 223, 233, 238, 240, 246, 252, 257, 262, 268, 273, 274, 278, 281, 
-  282, 286, 287, 290, 291, 295, 297, 300, 301, 304, 310, 314, 320, 321, 
-  329, 332, 340, 341, 342, 344, 346, 349, 351, 356, 362, 369, 370, 
-  372, 381, 383, 393, 394, 399, 416, 423, 427, 428, 430
-)
+sessionInfo()
 ```
 
-## Issue text: The raw dataset is quite large and includes several variables irrelevant to this study. Additionally, missinginess is inconsistently coded upon data import.
-## Modification text: EMA variables relevant to the study are extracted, and missingness is standardized across variables.
-
-## Issue text: The variable smoked_since_last_survey gave participants the option to select '6+' which, while useful for other analyses, prevents us from formatting the variable as numeric.
-## Modification text: The chunk below also converts '6+' to 6 for the variable smoked_since_last_survey.
-
-## Issue text: Instances where participants opted out were reported by the literal text 'opted out' in the raw dataset, making the data incompatible with the command to format the variable as numeric.
-## Modification text: In order to maintain these data but in a format compatible with numeric formatting, a variable to track opted out instances is created to check whether further actions to account for these cases must be taken.
-
-## Issue text: Variables are all in character format upon import.
-## Modification text: The below chunk also formats numeric variables as numeric.")`
-
-Note: the below code also includes counts of missingness before and after the data modifications. No data were lost during the modification process.
-
-```{r}
-# Read in CSV 
-part2beeped_raw <- read_csv(
-  part2_path,
-  na = c("-99", "__NA__", "NA", ""),
-  col_types = cols(.default = col_character()),
-  col_select = c(
-    mood,
-    smoke,
-    before_survey,
-    unpleasant,
-    prior_mood,
-    smoked_since_last_survey,
-    pleasant,
-    participant_id,
-    session_id,
-    completion_time,
-    init_time
-  )
-) %>%
-  filter(as.numeric(participant_id) %in% subset_ids)
-```
-
-```{r}
-# Check frequency of "opted out"
-vars_to_check <- c(
-  "mood", "smoke", "unpleasant", "pleasant",
-  "prior_mood", "smoked_since_last_survey",
-  "participant_id", "session_id"
-)
-
-opted_out_counts <- part2beeped_raw %>%
-  summarise(across(
-    all_of(vars_to_check),
-    ~ sum(. == "opted out", na.rm = TRUE)
-  )) %>%
-  tidyr::pivot_longer(
-    everything(),
-    names_to = "variable",
-    values_to = "n_opted_out"
-  ) %>%
-  arrange(desc(n_opted_out))
-
-opted_out_counts
-```
-
-```{r}
-# Record missingness BEFORE conversion
-missing_before <- part2beeped_raw %>%
-  summarise(across(everything(), ~ sum(is.na(.)))) %>%
-  tidyr::pivot_longer(
-    everything(),
-    names_to = "variable",
-    values_to = "missing_before"
-  )
-```
-
-# Prepare numeric variables for recoding and recode numeric variables
-
-```{r}
-part2beeped <- part2beeped_raw %>%
-  mutate(
-    across(
-      c(smoked_since_last_survey, mood, smoke, unpleasant,
-        pleasant, prior_mood, participant_id, session_id),
-      ~ trimws(.)
-    ),
-    
-#Recode smoked_since_last_survey
-    smoked_since_last_survey = case_when(
-      smoked_since_last_survey == "6+" ~ "6",  # convert 6+ to 6
-      TRUE ~ smoked_since_last_survey
-    ),
-    smoked_since_last_survey = suppressWarnings(
-      as.numeric(smoked_since_last_survey)
-    ),
-    
-#Recode mood, addressing the opted out case
-    mood = ifelse(mood == "opted out", NA, mood),
-    mood = suppressWarnings(as.numeric(mood)),
-    
-#Format all other numeric variables
-    smoke = suppressWarnings(as.numeric(smoke)),
-    unpleasant = suppressWarnings(as.numeric(unpleasant)),
-    pleasant = suppressWarnings(as.numeric(pleasant)),
-    prior_mood = suppressWarnings(as.numeric(prior_mood)),
-    participant_id = suppressWarnings(as.numeric(participant_id)),
-    session_id = suppressWarnings(as.numeric(session_id))
-    
-  )
-```
-
-```{r}
-# Record missingness AFTER conversion
-missing_after <- part2beeped %>%
-  summarise(across(everything(), ~ sum(is.na(.)))) %>%
-  tidyr::pivot_longer(
-    everything(),
-    names_to = "variable",
-    values_to = "missing_after"
-  )
-```
-
-# Inspect
-```{r}
-missing_summary <- missing_before %>%
-  left_join(missing_after, by = "variable") %>%
-  arrange(variable)
-
-missing_summary
-```
-Missingness increased by one case for 'mood' when the opted out data were converted to NA. Because the opportunity to examine this aspect of response behavior was nonexistent in this sample, the decision was made to simply recode the data to missing (i.e., NA).
-
-# Modification text: format time variables as POSIXct."
-```{r}
-part2beeped <- part2beeped %>%
-  mutate(init_time = as.POSIXct(init_time, tz = "UTC"),
-         completion_time = as.POSIXct(completion_time, tz = "UTC"))
-```
-
-Cleaned dataset meta-info:
-```{r}
-# Basic info
-cat("## Path      : in-memory dataframe\n")
-cat("## Extension : RDS\n")
-cat("## Size      :", format(object.size(part2beeped), units = "auto"), "\n")
-
-# Dimensions
-cat("## ncol      :", ncol(part2beeped), "\n")
-cat("## nrow      :", nrow(part2beeped), "\n")
-
-# Number of participants
-id_var <- "participant_id"
-n_participants <- n_distinct(part2beeped[[id_var]])
-cat("## Number participants :", n_participants, "\n")
-
-# Average number of observations per participant
-avg_obs <- nrow(part2beeped) / n_participants
-cat("## Average number obs :", round(avg_obs, 1), "\n")
-
-# Time period
-time_var <- "init_time"
-time_min <- min(part2beeped[[time_var]], na.rm = TRUE)
-time_max <- max(part2beeped[[time_var]], na.rm = TRUE)
-cat("## Period : from", format(time_min, "%Y-%m-%d %H:%M:%S"), 
-    "to", format(time_max, "%Y-%m-%d %H:%M:%S"), "\n")
-
-# Variable names
-cat("## Variables :", paste(names(part2beeped), collapse = ", "), "\n")
-```
-The EMA data are now prepared for Revol et. al.'s preprocessing workflow but must be merged with the parent study's baseline dataset for time-invariant variables (e.g., covariates). The below code 
-
-#Modification text: Baseline variables are preprocessed according to survey author guidelines (see parent study online repository for full list of baseline measures) and planned analyses.
-```{r}
-# Define paths to input data
-Apath <- here("data", "QuestionnairesA.xlsx")
-Bpath <- here("data", "QuestionnairesB.xlsx")
-
-# Read files into dataframes
-A <- read_excel(Apath)
-B <- read_excel(Bpath)
-
-# Merge the baseline datasets
-baseline <- merge(A, B, by = "participant-id", all = TRUE, suffixes = c(".A", ".B"))
-
-# Clean column names (lowercase, underscores instead of hyphens)
-baseline <- clean_names(baseline)
-
-# Filter to participants who completed Part 2 EMA
-analytic_sample <- c(102, 104, 107, 112, 113, 115, 116, 124, 125, 126, 127, 128, 133, 141, 150, 151, 154, 159, 163, 164, 166, 169, 175, 177, 180, 186, 188,
-192, 195, 196, 197, 198, 199, 202, 206, 209, 210, 213, 214, 216, 218, 221, 222, 223, 233, 238, 240, 246, 252, 257, 262, 268, 273, 274, 278, 281, 282, 286, 287, 290, 291, 295, 297, 300, 301, 304, 310, 314, 320, 321, 329, 332, 340, 341, 342, 344, 346, 349, 351, 356, 362, 369, 370, 372, 381, 383, 393, 394, 399, 416, 423, 427, 428, 430)
-baseline <- baseline %>% filter(participant_id %in% analytic_sample)
-
-# ---- FTND: Fagerstrom ----
-baseline <- baseline %>%
-  rename(cigsperday = ftnd_4) %>%
-  mutate(ftnd_4 = case_when(
-    cigsperday <= 10 ~ 1,
-    cigsperday > 10 & cigsperday <= 20 ~ 2,
-    cigsperday > 20 & cigsperday <= 30 ~ 3,
-    cigsperday > 30 ~ 4
-  )) %>%
-  mutate(ftnd_sum = ftnd_1 + ftnd_2 + ftnd_3 + ftnd_4 + ftnd_5 + ftnd_6)
-
-# ---- PANAS: Positive and Negative Affect Schedule ----
-baseline <- baseline %>%
-  mutate(
-    panas_pos = q64_pan_1 + q64_pan_3 + q64_pan_5 + q64_pan_9 + q64_pan_10 + q64_pan_12 + q64_pan_14 + q64_pan_16 + q64_pan_17 + q64_pan_19,
-    panas_neg = q64_pan_2 + q64_pan_4 + q64_pan_6 + q64_pan_7 + q64_pan_8 + q64_pan_11 + q64_pan_13 + q64_pan_15 + q64_pan_18 + q64_pan_20
-  )
-
-# ---- SHAPS: Snaith-Hamilton Pleasure Scale ----
-baseline <- baseline %>%
-  mutate(across(starts_with("q14_sha_"), ~ ifelse(. %in% c(1,2), 1, 0), .names = "{.col}_sim")) %>%
-  mutate(shaps_sim_sum = q14_sha_1_sim + q14_sha_2_sim + q14_sha_3_sim + q14_sha_4_sim + q14_sha_5_sim + q14_sha_6_sim + 
-           q14_sha_7_sim + q14_sha_8_sim + q14_sha_9_sim + q14_sha_10_sim + q14_sha_11_sim + q14_sha_12_sim + 
-           q14_sha_13_sim + q14_sha_14_sim)
-
-# ---- Reformat column types ----
-change_column_types <- function(df) {
-  for (col_name in colnames(df)) {
-    col_data <- df[[col_name]]
-    if (is.numeric(col_data) || inherits(col_data, "POSIXct")) next
-    if (is.character(col_data)) {
-      trimmed <- trimws(col_data)
-      numeric_check <- suppressWarnings(!is.na(as.numeric(trimmed)))
-      if (all(numeric_check | is.na(trimmed))) {
-        df[[col_name]] <- as.integer(trimmed)
-      } else {
-        df[[col_name]] <- trimmed
-      }
-    }
-  }
-  # Convert date columns
-  for (col_name in colnames(df)) {
-    if (grepl("_date_", col_name)) {
-      df[[col_name]] <- as.POSIXct(df[[col_name]], format = "%m/%d/%Y")
-    }
-  }
-  return(df)
-}
-baseline <- change_column_types(baseline)
-
-# ---- Fix column name typo ----
-baseline <- baseline %>% rename(total_household_income = total_houselhold_income)
-
-# ---- Subset to analysis-relevant variables ----
-baseline_clean <- baseline %>%
-  select(
-    participant_id,
-    race,
-    age,
-    gender,
-    total_household_income,
-    bank_balance,
-    ftnd_sum,
-    cigsperday,
-    shaps_sim_sum,
-    panas_pos,
-    panas_neg
-  )
-```
-'baseline_clean' is the dataframe with all baseline variables, now prepared for merging with the EMA data.
-
-##Issue text: the EMA data alone do not contain all participant data needed for analyses. They must be combined with baseline data.
-##Modification text: The EMA and Baseline Data are merged, and baseline variables listed after the EMA variables.
-
-```{r}
-# Specify baseline variables
-baseline_vars <- c(
-  "race",
-  "age",
-  "gender",
-  "total_household_income",
-  "bank_balance",
-  "ftnd_sum",
-  "cigsperday",
-  "shaps_sim_sum",
-  "panas_pos",
-  "panas_neg"
-)
-
-# Merge and reorder in a single step
-study_sample <- part2beeped %>%
-  left_join(baseline_clean, by = "participant_id") %>%
-  select(
-    # All columns except the baseline variables first
-    -all_of(baseline_vars),
-    # Then baseline variables at the end
-    all_of(baseline_vars)
-  )
-
-# Optional: inspect the first few rows and column order
-head(study_sample)
-colnames(study_sample)
-```
-
-study_sample meta-info:
-
+Meta-info of the Preprocessed dataset:
 ```{r}
 cat("## Path      : in-memory dataframe\n")
 cat("## Extension : RDS (original format, now in-memory)\n")
@@ -460,6 +145,11 @@ if(time_var %in% names(study_sample)) {
 cat("## Variables :", paste(names(study_sample), collapse = ", "), "\n")
 ```
 
+# Codebook table (forthcoming)
+
+In the table provided below, you will discover detailed information regarding each variable. 
+This information has been compiled from a manually curated codebook, which offers textual explanations (e.g., Description). 
+The remaining components (e.g., stats) have been generated by the function.
 
 ## First glimpse
 
@@ -484,7 +174,6 @@ summary(study_sample)
 ```{r}
 table(study_sample$before_survey, useNA="ifany")
 ```
-#Revol and colleagues' (2024) step for renaming and relabeling step skipped here because it was completed in previous steps.
 
 ## Duplication
 No issues detected.
@@ -694,7 +383,7 @@ study_sample$valid <- check_validity(study_sample)
 table(study_sample$valid)
 ```
 
-# Step 2: Design and sample scheme checking
+#Design and sample scheme checking
 
 This section is dedicated to checking and solving issues due to inconsistencies between the planned and the actual design of the study.
 
@@ -819,9 +508,7 @@ df %>%
 ```
 No issues detected.
 
-## Revol et. al.'s (2024) steps to examine time and delay to send steps were not possible with our dataset, given we lack a 'sent' variable. These steps were designed to determine whether the survey sending timing adhered to the sampling scheme, and the tests that are feasible in our dataset indicate the sampling scheme was adhered to. 
-
-# Step 3: Participants' response behaviors
+#Participants' response behaviors
 
 This section is dedicated to investigating how well participants engaged with the ESM study looking particularly for problematic patterns of behaviors (e.g., invalid observations, response time, careless responding).
 
@@ -1001,7 +688,9 @@ study_sample_intervals %>%
       x = "Delay (minutes)"
     )
 ```
+
 ## Compliance Rate
+
 We computed compliance rate scores for participants. We based this off the valid observation definition above and that each participant should have 18 valid observations.
 ```{r}
 obsno_max = 18
@@ -1021,61 +710,139 @@ study_sample %>%
             y="Number of participant",x="Compliance")
 ```
 
-# Step 4: Compute and transform variables
+# Study and data characteristics
 
-This section is dedicated to computing and modifying variables of interest that will later be used in visualization and statistical analysis.
+Following, you will find a selection of plot and descriptive analysis that give insight into important aspects of how well the data follow the pre-defined sampling scheme and the study design, as well as whether participants engaged in problematic response behaviors (e.g., careless responding).
 
-# Modification: Person-level mean and person-mean-centered versions of variables that will be used in analyses.`r txt('esm-mod','Modification',"the 'pos_aff' and 'neg_aff' variables are person-mean centered.")` 
+## Overview
+This section provides information about the global characteristics of the dataset (e.g., patterns of the missing values).
+<!-- 
+This section correspond to Step 1 of the preprocess ESM framework. 
+-->
+
+<br>
+
+**Participant time-invariant values:**
 ```{r}
-# Variables to process
-vars <- c("mood", "smoke", "unpleasant", "prior_mood", "pleasant")
+unique(data[,c("participant_id","age","compliance")])
+```
 
-study_sample <- study_sample %>%
-  group_by(participant_id) %>%  # compute within each person
-  mutate(
-    across(all_of(vars), ~ mean(.x, na.rm = TRUE), .names = "{.col}_pm"),  # person mean (between-person)
-    across(all_of(vars), ~ .x - mean(.x, na.rm = TRUE), .names = "{.col}_pmc")  # person-mean centered (within-person)
+
+### Compliance
+
+
+
+
+
+
+# Descriptive statistics and visualization
+
+This section gives insight into the variables themselves (e.g., distribution, correlation plots).
+In particular, a selection of relevant plots are displayed that help to investigate the within- and between-person differences (e.g., in time series, variable distributions), and patterns (e.g., variation of responses in function of a time variable).
+Additionally, a sub-section contains a participant book providing specific data information about each participant.
+
+
+**Overall distributions:** of 'mood' and 'smoke' variables.
+```{r}
+study_sample %>%
+  select(mood, smoke) %>%
+  pivot_longer(cols = everything(), names_to = "var", values_to = "value") %>%
+  filter(is.finite(value)) %>%   # removes NA, NaN, Inf
+  ggplot(aes(x = value)) +
+    geom_histogram(aes(y = after_stat(density)), 
+                   alpha = 0.7, bins = 50) + 
+    geom_density(alpha = 0.5) +
+    facet_grid(var ~ ., scales = "free")
+```
+
+**Participant distribution plot:** displays a density curse for each participant, regrouping per variable ('pos_aff' and 'neg_aff'). 
+```{r}
+study_sample %>%
+  gather(key = var, value = smoke, unpleasant, pleasant) %>%
+  ggplot(aes (x = value, color=factor(participant_id))) +
+      geom_density(alpha = 0.5) +
+      facet_grid(var~.) +
+        labs(title="Participants' distributions of unpleasant and pleasant", x="value", color="id")
+```
+
+
+**Correlation plot** of variables 'pos_aff', 'neg_aff' and 'perc_fun_signaled'.
+It displays the correlation scores (along with significance test result), the distribution and the scatterplot between two variables. 
+```{r}
+study_sample %>%
+  select(participant_id, smoke, pleasant, unpleasant) %>%
+  pivot_longer(
+    cols = c(smoke, pleasant, unpleasant),
+    names_to = "var",
+    values_to = "value"
   ) %>%
-  ungroup()
+  filter(is.finite(value)) %>%
+  ggplot(aes(x = value, color = factor(participant_id))) +
+    geom_density(alpha = 0.3, linewidth = 0.4) +
+    facet_grid(var ~ ., scales = "free") +
+    labs(
+      title = "Participants' distributions of smoke, pleasant, and unpleasant",
+      x = "Value",
+      color = "Participant ID"
+    ) +
+    theme_minimal() +
+    theme(legend.position = "none")
 ```
 
-Preprocessed data meta-info
+
+**Time series** for the **'pos_aff'** variable of each dyads' partners.
+```{r, fig.height=8, fig.width=8}
+ggplot(data = data, aes(x = obsno, y = pos_aff, color=factor(role))) +
+  geom_line() +
+  facet_wrap(dyad~., ncol=3) +
+        labs(title="Times series of pos_aff", x="Observation number", color="role")
+```
+
+**Time series** for the **'neg_aff'** variable of each dyads' partners.
+```{r, fig.height=8, fig.width=8}
+ggplot(data = data, aes(x = obsno, y = neg_aff, color=factor(role))) +
+  geom_line() +
+  facet_wrap(dyad~., ncol=3) +
+        labs(title="Times series of neg_aff", x="Observation number", color="role")
+```
+
+
+**Contemporaneous dyad plot**: the plot is composed of scatterplots for the 'pos_aff' variables, with the father's pos_aff on the x-axis and the mother's pos_aff on the y-axis.
+It helps investigating the contemporaneous relationship between the father and the mother within dyads.
+```{r, fig.height=8, fig.width=8}
+ggplot(data = data_dyad, aes(x = pos_aff_2, y = pos_aff_1)) +
+  geom_jitter() +
+  facet_wrap(dyad~., ncol=3) +
+  labs(title="Contemporaneous dyad relationship in pos_aff", x="pos_aff father", y="pos_aff mother")
+```
+
+
+**Contemporaneous dyad plot**: the plot is composed of scatterplots for the 'neg_aff' variables, with the father's neg_aff on the x-axis and the mother's neg_aff on the y-axis. 
+It helps investigating the contemporaneous relationship between the father and the mother within dyads.
+
+```{r, fig.height=8, fig.width=8}
+ggplot(data = data_dyad, aes(x = neg_aff_2, y = neg_aff_1)) +
+  geom_jitter() +
+  facet_wrap(dyad~., ncol=3) +
+  labs(title="Contemporaneous dyad relationship in neg_aff", x="neg_aff father", y="neg_aff mother")
+```
+
+
+## Participant book
+<!-- 
+Create a table that provides information about the participants' response behaviors (e.g., compliance, study duration, start time) 
+as well as descriptive statistics and time series plots of the variables of interest. 
+You can use the participant_book() function from the esmtools package 
+-->
+In the table below, you will find comprehensive information about each participant, including the start and end times of their participation, their response behaviors (e.g., compliance), as well as their time series and histogram data for the two variables of interest.
 ```{r}
-cat("## Path      : in-memory dataframe\n")
-cat("## Extension : RDS (original format, now in-memory)\n")
-cat("## Size      :", format(object.size(study_sample), units = "auto"), "\n\n")
-
-# Dimensions
-cat("## ncol      :", ncol(study_sample), "\n")
-cat("## nrow      :", nrow(study_sample), "\n\n")
-
-# Number of participants
-id_var <- "participant_id"
-n_participants <- n_distinct(study_sample[[id_var]])
-cat("## Number of participants :", n_participants, "\n")
-
-# Average number of observations per participant
-avg_obs <- nrow(study_sample) / n_participants
-cat("## Average number of observations per participant :", round(avg_obs, 1), "\n\n")
-
-# Time period
-time_var <- "init_time"
-if(time_var %in% names(study_sample)) {
-  time_min <- min(study_sample[[time_var]], na.rm = TRUE)
-  time_max <- max(study_sample[[time_var]], na.rm = TRUE)
-  cat("## Period : from", format(time_min, "%Y-%m-%d %H:%M:%S"),
-      "to", format(time_max, "%Y-%m-%d %H:%M:%S"), "\n\n")
-} else {
-  cat("## Period : init_time variable not found in dataset\n\n")
-}
-
-# Variable names
-cat("## Variables :", paste(names(study_sample), collapse = ", "), "\n")
+participants_book(data, 
+        idvar="id", 
+        obsnovar="obsno",
+        focusvar=c("pos_aff", "neg_aff"), 
+        timevar="start", 
+        validvar="valid", 
+        compliancevar = "compliance",
+        viz=list(c("ts","hist"), c("ts","hist")),
+        html_output="report_examples/tables/Participant_book_example.html")
 ```
-```{r}
-# Save the study_sample dataframe as an RDS file
-saveRDS(study_sample, file = here("output", "cleaned_study_sample.RDS"))
-```
-
-#Revol, J., Carlier, C., Lafit, G., Verhees, M., Sels, L., & Ceulemans, E. (2024). Preprocessing ESM data: a step-by-step framework, tutorial website, R package, and reporting templates.
-

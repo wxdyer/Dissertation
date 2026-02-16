@@ -700,7 +700,7 @@ This section is dedicated to checking and solving issues due to inconsistencies 
 
 ## Calendar
 
-Overview when the beeps were completed in a calendar format
+Overview when the beeps were sent in a calendar format
 
 ```{r}
 study_sample %>%
