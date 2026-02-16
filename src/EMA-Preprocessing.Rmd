@@ -55,9 +55,6 @@ In certain cases, you might need to use the '!important' declaration to override
 }
 </style>
 
-
-
-
 <!-- This first chunk define the global settings-->
 ```{r, include=FALSE}
 # Setup global settings
@@ -66,7 +63,7 @@ In certain cases, you might need to use the '!important' declaration to override
 
 # Overview and data collection procedure
 
-This R Markdown file is based on Revol et al. (2024)'s step-by-step guidelines for preprocessing ESM data: [https://preprocess.esmtools.com](https://preprocess.esmtools.com). It includes code adapted from Steps 1 - 5, tailored to preprocess EMA data for a secondary analysis of EMA data from the DVAL project (https://osf.io/nb9ct/overview?view_only=4f777b3907bb47aab6387aaa4353285c. In part2 of the study, participants recieved semi-random prompts 6 times throughout the day within predeterimined 2-hr intervals for three consecutive days. 
+This R Markdown file is based on Revol et al. (2024)'s step-by-step guidelines for preprocessing ESM data: [https://preprocess.esmtools.com](https://preprocess.esmtools.com). It includes code adapted from Steps 1 - 5, tailored to preprocess EMA data for a secondary analysis of EMA data from the DVAL project (https://osf.io/nb9ct/overview?view_only=4f777b3907bb47aab6387aaa4353285c. In Part 2 of the study, participants received semi-random prompts 6 times throughout the day within predeterimined 2-hr intervals for three consecutive days. 
 
 ---
 # Load packages
