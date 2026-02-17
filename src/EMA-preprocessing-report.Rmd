@@ -542,30 +542,6 @@ if(time_var %in% names(study_sample_full)) {
 cat("## Variables :", paste(names(study_sample_full), collapse = ", "), "\n")
 ```
 
-## First glimpse
-The following chunk helps to have a first insight on what the dataset looks like.
-
-```{r}
-dim(study_sample_full)
-```
-```{r}
-head(study_sample_full)
-```
-
-```{r}
-tail(study_sample_full)
-```
-```{r}
-glimpse(study_sample_full)
-```
-```{r}
-summary(study_sample_full)
-```
-```{r}
-table(study_sample_full$before_survey, useNA="ifany")
-table(study_sample_part2_only$before_survey, useNA="ifany")
-```
-
 # To determine the best-suitable data for our analyses, we use logical tests to define which observations are valid so that we can compare the total N of valid observations between the two datasets. The 'valid' observations are the ones where there are no missing values in the variables of interest (i.e., 'mood', 'before_survey', 'smoke'), and two others ('pleasant', 'unpleasant') in function of the branching items (see above). We created a function that can be used later.
 ```{r}
 # Create validity function 
@@ -604,7 +580,27 @@ comparison_overall <- tibble(
 
 comparison_overall
 ```
-# The full sample contains more available cases for analysis than the Part 2 only sample, despite attrition. The remaining data preprocessing and characteristics reporting will reflect actions performed on the full dataset (study_sample_full).
+The full sample contains more available cases for analysis than the Part 2 only sample, despite attrition. The remaining data preprocessing and characteristics reporting will reflect actions performed on the full dataset (study_sample_full).
+
+## First glimpse
+The following chunk helps to have a first insight on what the dataset looks like.
+
+```{r}
+dim(study_sample_full)
+```
+```{r}
+head(study_sample_full)
+```
+
+```{r}
+tail(study_sample_full)
+```
+```{r}
+glimpse(study_sample_full)
+```
+```{r}
+summary(study_sample_full)
+```
 
 #Revol and colleagues' (2024) step for renaming and relabeling step skipped here because it was completed in previous steps.
 
@@ -613,16 +609,16 @@ No issues detected.
 
 **Look for duplicated rows:** the dataframes do not have duplicated rows.
 ```{r}
-sum(duplicated(study_sample_part2_only))
+sum(duplicated(study_sample_full))
 ```
 ```{r}
-sum(duplicated(study_sample_part2_only))
+sum(duplicated(study_sample_full))
 ```
 
 **Look for duplicated answers** (duplication in the self-reported items): no issue found regarding the number of self-reported items, the values of the variables involved, and the number of times duplicated .
 
 ```{r}
-study_sample_part2_only[!is.na(study_sample_part2_only$init_time),] %>% # Select answered observations
+study_sample_full[!is.na(study_sample_full$init_time),] %>% # Select answered observations
     select(mood:pleasant) %>%  # Select self-report items
     group_by_all() %>%
     summarise(n = n()) %>% # Compute number of similar self-reported item values
@@ -636,7 +632,7 @@ answer_cols <- c("participant_id", "mood", "smoke", "before_survey",
                  "unpleasant", "prior_mood", "smoked_since_last_survey", 
                  "pleasant", "session_id", "completion_time", "init_time")
 
-dup_answers <- study_sample_part2_only %>%
+dup_answers <- study_sample_full %>%
   group_by(across(all_of(answer_cols))) %>%
   filter(n() > 1) %>%
   ungroup()
@@ -671,54 +667,54 @@ branch_check
 ```
 
 ```{r}
-gg_miss_upset(study_sample_part2_only)
+gg_miss_upset(study_sample_full)
 ```
 
 
 # Check variable coherence
 # **Consistency of time-invariant variables.**
 ```{r}
-study_sample_part2_only %>%
+study_sample_full %>%
   group_by(participant_id) %>%
   summarise(n_age_values = n_distinct(age)) %>%
   filter(n_age_values > 1)
 
-study_sample_part2_only %>%
+study_sample_full %>%
   group_by(participant_id) %>%
   summarise(n_race_values = n_distinct(race)) %>%
   filter(n_race_values > 1)
 
-study_sample_part2_only %>%
+study_sample_full %>%
   group_by(participant_id) %>%
   summarise(n_gender_values = n_distinct(gender)) %>%
   filter(n_gender_values > 1)
 
-study_sample_part2_only %>%
+study_sample_full %>%
   group_by(participant_id) %>%
   summarise(n_total_household_income_values = n_distinct(total_household_income)) %>%
   filter(n_total_household_income_values > 1)
 
-study_sample_part2_only %>%
+study_sample_full %>%
   group_by(participant_id) %>%
   summarise(n_panas_pos_values = n_distinct(panas_pos)) %>%
   filter(n_panas_pos_values > 1)
 
-study_sample_part2_only %>%
+study_sample_full %>%
   group_by(participant_id) %>%
   summarise(n_panas_neg_values = n_distinct(panas_neg)) %>%
   filter(n_panas_neg_values > 1)
 
-study_sample_part2_only %>%
+study_sample_full %>%
   group_by(participant_id) %>%
   summarise(n_bank_balance_values = n_distinct(bank_balance)) %>%
   filter(n_bank_balance_values > 1)
 
-study_sample_part2_only %>%
+study_sample_full %>%
   group_by(participant_id) %>%
   summarise(n_ftnd_sum_values = n_distinct(ftnd_sum)) %>%
   filter(n_ftnd_sum_values > 1)
 
-study_sample_part2_only %>%
+study_sample_full %>%
   group_by(participant_id) %>%
   summarise(n_cigsperday_values = n_distinct(cigsperday)) %>%
   filter(n_cigsperday_values > 1)
@@ -735,10 +731,10 @@ The following plot gives an overview of the missing values in the dataframe.
 
 ```{r, fig.width=7, fig.height=7}
 # Reorder variables
-data = study_sample_part2_only %>% arrange(participant_id, completion_time)
+data = study_sample_full %>% arrange(participant_id, completion_time)
 
 # Overiew of missing values
-vis_miss(study_sample_part2_only)
+vis_miss(study_sample_full)
 ```
 We can see multiple patterns and some missingness among the EMA variables.
 
@@ -746,7 +742,7 @@ We can see multiple patterns and some missingness among the EMA variables.
 
 # Create time variables
 ```{r}
-study_sample_part2_only <- study_sample_part2_only %>%
+study_sample_full <- study_sample_full %>%
   
   arrange(participant_id, completion_time) %>%
   
@@ -802,7 +798,7 @@ This section is dedicated to checking and solving issues due to inconsistencies 
 Overview when the beeps were completed in a calendar format
 
 ```{r}
-study_sample_part2_only %>%
+study_sample_full %>%
   filter(!is.na(completion_time)) %>%    
   mutate(
     year = year(completion_time),
@@ -832,7 +828,7 @@ study_sample_part2_only %>%
 ## Sampling scheme plot and quantity of completed beeps
 We proceed to the checking of the actual sample scheme and compare it to the defined one. 
 ```{r, warning=FALSE, message=FALSE}
-study_sample_part2_only %>%
+study_sample_full %>%
   filter(!is.na(completion_time)) %>%
   mutate(
     weekday_type = ifelse(wday(completion_time, week_start = 1) %in% c(6,7), "weekend", "weekday")
@@ -862,12 +858,12 @@ Here we can see that week(end) days are unevenly distributed across participants
 
 ```{r}
 # Examine number of completed beeps per participant
-study_sample_part2_only %>%
+study_sample_full %>%
   group_by(participant_id) %>% 
   summarize(n_completed_beeps = n(), .groups = "drop") %>%
   ggplot(aes(x = factor(participant_id), y = n_completed_beeps)) +
     geom_col(position = "dodge", fill = "steelblue") +
-    scale_y_continuous(breaks = seq(0, max(study_sample_part2_only$obsno, na.rm = TRUE), 5)) +
+    scale_y_continuous(breaks = seq(0, max(study_sample_full$obsno, na.rm = TRUE), 5)) +
     labs(
       title = "Number of completed beeps per participant",
       x = "Participant ID",
@@ -884,7 +880,7 @@ study_sample_part2_only %>%
 We check whether there is timestamp incoherence within observations (e.g., an observation with 'start' time after the 'end' time) or between observations (e.g., an observation that was scheduled after another one but with a 'start' time that is before).
 ```{r}
 # Select and order relevant variables
-df <- study_sample_part2_only[, c("participant_id", "obsno",
+df <- study_sample_full[, c("participant_id", "obsno",
                        "init_time", "completion_time")]
 
 df <- df[order(df$participant_id, df$obsno), ]
@@ -932,7 +928,7 @@ No issues detected.
 
 ```{r}
 # Sampling Scheme plot: this plot illustrates the start times of participants’ valid observations. The x-axis represents the observation number and the y-axis shows the distribution across weekdays and weekends. We see that participant 238 only produces 10/18 valid observations and that occurrences of missing valid observations tend to exist toward the end of the observation period. 
-study_sample_part2_only %>%
+study_sample_full %>%
   filter(valid == 1) %>%
   mutate(
     weekday = ifelse(
@@ -953,7 +949,7 @@ study_sample_part2_only %>%
 ```{r}
 # Sampling scheme plot: this plot illustrates the start times of participants’ valid observations with continuous x-axis over the days of participation.
 
-df <- study_sample_part2_only %>%
+df <- study_sample_full %>%
   filter(valid == 1) %>%
   group_by(participant_id) %>%
   mutate(
@@ -996,7 +992,7 @@ df %>%
 
 ```{r}
 # Number of valid response over 'obsno' and it shows a slight decrease over time.
-study_sample_part2_only %>% 
+study_sample_full %>% 
   filter(valid==1) %>% 
   group_by(obsno) %>% summarize(n = n()) %>%
   ggplot(aes(x=obsno,y=n)) +
@@ -1006,7 +1002,7 @@ study_sample_part2_only %>%
 ```
 ```{r}
 # Time of day beeps were started and (and valid).
-study_sample_part2_only %>%
+study_sample_full %>%
   filter(valid == 1) %>%
   mutate(
     weekday = ifelse(
@@ -1032,7 +1028,7 @@ study_sample_part2_only %>%
 ## Number of interactions
 **Hour at which the beeps were started (in blue) and missed (in red):**
 ```{r}
-df_interact <- study_sample_part2_only %>%
+df_interact <- study_sample_full %>%
   mutate(
     hour = hour(init_time),
     sent_ = !is.na(init_time),
@@ -1062,12 +1058,12 @@ df_interact %>%
 
 Compute delay to fill  variables. Revol & colleagues' (2024) preprocessing steps for computing delay to fill is not possible because we lack a 'sent' variable. Will be only used for the creation of plot and won't be exported in the preprocessed dataframe. We see most of the valid surveys are submitted in under five minutes, which is expected. 
 ```{r}
-study_sample_part2_only <- study_sample_part2_only %>%
+study_sample_full <- study_sample_full %>%
   mutate(
     daily_end_min   = as.numeric(difftime(completion_time, init_time, units = "mins"))
   )
 
-study_sample_part2_only %>%
+study_sample_full %>%
   filter(valid == 1 & !is.na(daily_end_min)) %>%
   ggplot(aes(x = daily_end_min)) +
     geom_histogram(bins = 100, fill = "steelblue", color = "black") +
@@ -1082,7 +1078,7 @@ study_sample_part2_only %>%
 No issues detected.
 ```{r}
 # Compute time intervals between consecutive beeps within a day
-study_sample_part2_only_intervals <- study_sample_part2_only %>%
+study_sample_full_intervals <- study_sample_full %>%
   filter(valid == 1) %>% 
   arrange(participant_id, obsno) %>%
   group_by(participant_id, dayno) %>%
@@ -1090,7 +1086,7 @@ study_sample_part2_only_intervals <- study_sample_part2_only %>%
   ungroup()
 
 # Plot histogram of intra-day beep intervals
-study_sample_part2_only_intervals %>%
+study_sample_full_intervals %>%
   filter(!is.na(time_int)) %>%  # remove last beep in each day (no next beep)
   ggplot(aes(x = time_int)) +
     geom_histogram(bins = 100, fill = "steelblue", color = "black") +
@@ -1104,15 +1100,15 @@ study_sample_part2_only_intervals %>%
 We computed compliance rate scores for participants. We based this off the valid observation definition above and that each participant should have 18 valid observations.
 ```{r}
 obsno_max = 18
-study_sample_part2_only$compliance = ave(study_sample_part2_only$valid, study_sample_part2_only$participant_id, FUN=function(x) sum(x, na.rm=TRUE)) / obsno_max
+study_sample_full$compliance = ave(study_sample_full$valid, study_sample_full$participant_id, FUN=function(x) sum(x, na.rm=TRUE)) / obsno_max
 
-study_sample_part2_only %>%
+study_sample_full %>%
     group_by(participant_id) %>% slice(1) %>%    # Keep one row per participant
     ggplot(aes(y=compliance, x=factor(participant_id))) +
         geom_col(position = "dodge") +
         labs(title="Compliance score of each participant",
             y="Compliance",x="Participant id")
-study_sample_part2_only %>%
+study_sample_full %>%
     group_by(participant_id) %>% slice(1) %>%    # Keep one row per participant
     ggplot(aes(x=compliance)) +
         geom_histogram() +
@@ -1129,7 +1125,7 @@ This section is dedicated to computing and modifying variables of interest that 
 # Variables to process
 vars <- c("mood", "smoke", "unpleasant", "prior_mood", "pleasant")
 
-study_sample_part2_only <- study_sample_part2_only %>%
+study_sample_full <- study_sample_full %>%
   group_by(participant_id) %>%  # compute within each person
   mutate(
     across(all_of(vars), ~ mean(.x, na.rm = TRUE), .names = "{.col}_pm"),  # person mean (between-person)
@@ -1142,26 +1138,26 @@ Preprocessed data meta-info
 ```{r}
 cat("## Path      : in-memory dataframe\n")
 cat("## Extension : RDS (original format, now in-memory)\n")
-cat("## Size      :", format(object.size(study_sample_part2_only), units = "auto"), "\n\n")
+cat("## Size      :", format(object.size(study_sample_full), units = "auto"), "\n\n")
 
 # Dimensions
-cat("## ncol      :", ncol(study_sample_part2_only), "\n")
-cat("## nrow      :", nrow(study_sample_part2_only), "\n\n")
+cat("## ncol      :", ncol(study_sample_full), "\n")
+cat("## nrow      :", nrow(study_sample_full), "\n\n")
 
 # Number of participants
 id_var <- "participant_id"
-n_participants <- n_distinct(study_sample_part2_only[[id_var]])
+n_participants <- n_distinct(study_sample_full[[id_var]])
 cat("## Number of participants :", n_participants, "\n")
 
 # Average number of observations per participant
-avg_obs <- nrow(study_sample_part2_only) / n_participants
+avg_obs <- nrow(study_sample_full) / n_participants
 cat("## Average number of observations per participant :", round(avg_obs, 1), "\n\n")
 
 # Time period
 time_var <- "init_time"
-if(time_var %in% names(study_sample_part2_only)) {
-  time_min <- min(study_sample_part2_only[[time_var]], na.rm = TRUE)
-  time_max <- max(study_sample_part2_only[[time_var]], na.rm = TRUE)
+if(time_var %in% names(study_sample_full)) {
+  time_min <- min(study_sample_full[[time_var]], na.rm = TRUE)
+  time_max <- max(study_sample_full[[time_var]], na.rm = TRUE)
   cat("## Period : from", format(time_min, "%Y-%m-%d %H:%M:%S"),
       "to", format(time_max, "%Y-%m-%d %H:%M:%S"), "\n\n")
 } else {
@@ -1169,11 +1165,11 @@ if(time_var %in% names(study_sample_part2_only)) {
 }
 
 # Variable names
-cat("## Variables :", paste(names(study_sample_part2_only), collapse = ", "), "\n")
+cat("## Variables :", paste(names(study_sample_full), collapse = ", "), "\n")
 ```
 ```{r}
-# Save the study_sample_part2_only dataframe as an RDS file
-saveRDS(study_sample_part2_only, file = here("output", "cleaned_study_sample_part2_only.RDS"))
+# Save the study_sample_full dataframe as an RDS file
+saveRDS(study_sample_full, file = here("output", "cleaned_study_sample_full.RDS"))
 ```
 
 #Revol, J., Carlier, C., Lafit, G., Verhees, M., Sels, L., & Ceulemans, E. (2024). Preprocessing ESM data: a step-by-step framework, tutorial website, R package, and reporting templates.
