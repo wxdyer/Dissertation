@@ -1,0 +1,177 @@
+---
+title: "Data characteristics report"
+author:
+  - name: Walter G. Dyer, wdyer@psu.edu, Penn State University
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+      toc: true
+      number_sections: false
+      toc_float: true
+      toc_depth: 2
+---
+
+
+<!-- Javascript code to zoom in and out in the plots. -->
+<!-- Code from Radovan Miletić: https://stackoverflow.com/questions/56361986/zoom-function-in-rmarkdown-html-plot -->
+<script src = "https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+<script type="text/javascript">
+$(document).ready(function() {
+    $('body').prepend('<div class=\"zoomDiv\"><img src=\"\" class=\"zoomImg\"></div>');
+    // onClick function for all plots (img's)
+    $('img:not(.zoomImg)').click(function() {
+    $('.zoomImg').attr('src', $(this).attr('src')).css({width: '100%'});
+    $('.zoomDiv').css({opacity: '1', width: 'auto', border: '1px solid white', borderRadius: '5px', position: 'fixed', top: '50%', left: '50%', marginRight: '-50%', transform: 'translate(-50%, -50%)', boxShadow: '0px 0px 50px #888888', zIndex: '50', overflow: 'auto', maxHeight: '100%'});
+    });
+    // onClick function for zoomImg
+    $('img.zoomImg').click(function() {
+    $('.zoomDiv').css({opacity: '0', width: '0%'}); 
+    });
+});
+</script>
+
+<!--------- INSTRUCTIONS ----------
+This template would help you to structure and share the characteristic and the characteristics of your preprocessed dataset. 
+It is based on the ESM preprocessing framework described in Revol and al. (under review). 
+In addition, it is associated with an R packages, the esmtools package (package.esmtools.com), 
+and a website to provide tutorials and R code for each step: preprocess.esmtools.com. 
+Please, follow the instructions commented and add descriptions above each chunk you create. 
+Note that the commented instructions are not displayed in the rendered document. 
+<!--------------------------------->
+
+
+
+<!-- This first chunk define the global settings and hidden variables of the file. -->
+```{r, include=FALSE}
+# For scroll bar when the output is longer than what is defined in the chunk:   {r, max.height='600px'}
+options(width = 10000)
+local({
+  hook_output <- knitr::knit_hooks$get('output')
+  knitr::knit_hooks$set(output = function(x, options) {
+    if (!is.null(options$max.height)) options$attr.output <- c(
+      options$attr.output,
+      sprintf('style="max-height: %s;"', options$max.height)
+    )
+    hook_output(x, options)
+  })
+})
+
+knitr::opts_chunk$set(message=FALSE, warning=FALSE) # set multiple global options here
+```
+# Import
+```{r}
+#Packages
+library(here)
+library(dplyr)
+library(tidyr)
+library(tableone)
+```
+
+```{r}
+# Read in data
+study_sample <- readRDS(here("output", "cleaned_study_sample.RDS"))
+```
+
+#1.	What are the demographic characteristics of the sample?
+
+```{r}
+#"Table 1."
+library(tableone)
+library(dplyr)
+library(gt)
+
+# Recode race and gender as factors with labels
+study_sample <- study_sample %>%
+  mutate(
+    race = factor(
+      race,
+      levels = 1:7,
+      labels = c(
+        "American Indian or Alaska Native",
+        "Asian",
+        "Black or African-American",
+        "Native Hawaiian or Other Pacific Islander",
+        "White",
+        "More than one race",
+        "Unknown or prefer not to answer"
+      )
+    ),
+    gender = factor(
+      gender,
+      levels = 1:2,
+      labels = c("Male", "Female")
+    )
+  )
+
+# Variables for Table 1
+vars <- c(
+  "race",
+  "age",
+  "gender",
+  "total_household_income",
+  "bank_balance",
+  "ftnd_sum",
+  "cigsperday",
+  "shaps_sim_sum",
+  "panas_pos",
+  "panas_neg"
+)
+
+catVars <- c("race", "gender")
+
+# Create Table 1
+table1 <- CreateTableOne(
+  vars = vars,
+  data = study_sample,
+  factorVars = catVars
+)
+
+# Convert Table 1 to a data.frame for gt
+table1_df <- print(table1, showAllLevels = TRUE, quote = FALSE, printToggle = FALSE) %>%
+  as.data.frame() %>%
+  tibble::rownames_to_column(var = "Variable") %>%
+  rename(Statistic = `Overall`)
+
+# Optional: remove % sign for cleaner look if desired
+table1_df$Statistic <- gsub("%", "", table1_df$Statistic)
+
+# Make GT table
+table1_df %>%
+  gt() %>%
+  tab_header(
+    title = "Table 1. Participant Characteristics"
+  ) %>%
+  cols_label(
+    Variable = "Variable",
+    Statistic = "Overall"
+  ) %>%
+  fmt_number(
+    columns = vars[vars != "race" & vars != "gender"], # format numeric variables
+    decimals = 2
+  ) %>%
+  opt_table_font(
+    font = list(
+      default_fonts()
+    )
+  ) %>%
+  tab_options(
+    table.font.size = px(13),
+    heading.title.font.size = px(16),
+    data_row.padding = px(5)
+  )
+```
+
+
+
+
+
+
+#2.	What are the intraclass correlations (ICCs) for key EMA variables (e.g., craving, unpleasantness, pleasantness, and mood)?
+  #a.	This will help distinguish between- and within-person variance and justify modeling decisions
+#3.	Means for mood and craving across unpleasant, pleasant, and neutral event appraisal conditions.
+#4.	What is the effect of the abstinence incentive?
+#5.	Person-level cigarette use behavior over the course of the study.
+#6.	Number of available cases for each Aim.
+  #a.	This will involve the creation of a consort diagram
+#7.	Descriptives of compliance. Are there significant trends in non-compliance that should be accounted for (e.g., participant characteristics)?
+#8.	Do the CO data align with the EMA data on cigarette smoking for each participant?

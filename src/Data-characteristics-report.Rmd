@@ -755,94 +755,96 @@ study_sample %>%
     facet_grid(var ~ ., scales = "free")
 ```
 
-**Participant distribution plot:** displays a density curse for each participant, regrouping per variable ('pos_aff' and 'neg_aff'). 
+
+
 ```{r}
+# mood & unpleasant
 study_sample %>%
-  gather(key = var, value = smoke, unpleasant, pleasant) %>%
-  ggplot(aes (x = value, color=factor(participant_id))) +
-      geom_density(alpha = 0.5) +
-      facet_grid(var~.) +
-        labs(title="Participants' distributions of unpleasant and pleasant", x="value", color="id")
+  ungroup() %>%
+  select(mood, unpleasant) %>%
+  filter(!is.na(mood) & !is.na(unpleasant)) %>%  # remove rows with missing values
+  ggpairs(
+    title = "Correlation: Mood and Unpleasant",
+    upper = list(continuous = wrap("cor")),     # correlation coefficient in upper triangle
+    diag  = list(continuous = wrap("densityDiag")), # density on diagonal
+    lower = list(continuous = wrap("points"))   # scatterplots in lower triangle
+  )
 ```
 
-
-**Correlation plot** of variables 'pos_aff', 'neg_aff' and 'perc_fun_signaled'.
-It displays the correlation scores (along with significance test result), the distribution and the scatterplot between two variables. 
 ```{r}
+# Mood & Pleasant
 study_sample %>%
-  select(participant_id, smoke, pleasant, unpleasant) %>%
-  pivot_longer(
-    cols = c(smoke, pleasant, unpleasant),
-    names_to = "var",
-    values_to = "value"
-  ) %>%
-  filter(is.finite(value)) %>%
-  ggplot(aes(x = value, color = factor(participant_id))) +
-    geom_density(alpha = 0.3, linewidth = 0.4) +
-    facet_grid(var ~ ., scales = "free") +
-    labs(
-      title = "Participants' distributions of smoke, pleasant, and unpleasant",
-      x = "Value",
-      color = "Participant ID"
-    ) +
-    theme_minimal() +
-    theme(legend.position = "none")
+  ungroup() %>%
+  select(mood, pleasant) %>%
+  filter(!is.na(mood) & !is.na(pleasant)) %>%  # remove rows with missing values
+  ggpairs(
+    title = "Correlation: Mood and Pleasant",
+    upper = list(continuous = wrap("cor")),       # correlation coefficient
+    diag  = list(continuous = wrap("densityDiag")), # density on diagonal
+    lower = list(continuous = wrap("points"))     # scatterplots
+  )
 ```
 
-
-**Time series** for the **'pos_aff'** variable of each dyads' partners.
-```{r, fig.height=8, fig.width=8}
-ggplot(data = data, aes(x = obsno, y = pos_aff, color=factor(role))) +
-  geom_line() +
-  facet_wrap(dyad~., ncol=3) +
-        labs(title="Times series of pos_aff", x="Observation number", color="role")
-```
-
-**Time series** for the **'neg_aff'** variable of each dyads' partners.
-```{r, fig.height=8, fig.width=8}
-ggplot(data = data, aes(x = obsno, y = neg_aff, color=factor(role))) +
-  geom_line() +
-  facet_wrap(dyad~., ncol=3) +
-        labs(title="Times series of neg_aff", x="Observation number", color="role")
-```
-
-
-**Contemporaneous dyad plot**: the plot is composed of scatterplots for the 'pos_aff' variables, with the father's pos_aff on the x-axis and the mother's pos_aff on the y-axis.
-It helps investigating the contemporaneous relationship between the father and the mother within dyads.
-```{r, fig.height=8, fig.width=8}
-ggplot(data = data_dyad, aes(x = pos_aff_2, y = pos_aff_1)) +
-  geom_jitter() +
-  facet_wrap(dyad~., ncol=3) +
-  labs(title="Contemporaneous dyad relationship in pos_aff", x="pos_aff father", y="pos_aff mother")
-```
-
-
-**Contemporaneous dyad plot**: the plot is composed of scatterplots for the 'neg_aff' variables, with the father's neg_aff on the x-axis and the mother's neg_aff on the y-axis. 
-It helps investigating the contemporaneous relationship between the father and the mother within dyads.
-
-```{r, fig.height=8, fig.width=8}
-ggplot(data = data_dyad, aes(x = neg_aff_2, y = neg_aff_1)) +
-  geom_jitter() +
-  facet_wrap(dyad~., ncol=3) +
-  labs(title="Contemporaneous dyad relationship in neg_aff", x="neg_aff father", y="neg_aff mother")
-```
-
-
-## Participant book
-<!-- 
-Create a table that provides information about the participants' response behaviors (e.g., compliance, study duration, start time) 
-as well as descriptive statistics and time series plots of the variables of interest. 
-You can use the participant_book() function from the esmtools package 
--->
-In the table below, you will find comprehensive information about each participant, including the start and end times of their participation, their response behaviors (e.g., compliance), as well as their time series and histogram data for the two variables of interest.
 ```{r}
-participants_book(data, 
-        idvar="id", 
-        obsnovar="obsno",
-        focusvar=c("pos_aff", "neg_aff"), 
-        timevar="start", 
-        validvar="valid", 
-        compliancevar = "compliance",
-        viz=list(c("ts","hist"), c("ts","hist")),
-        html_output="report_examples/tables/Participant_book_example.html")
+# Mood & Smoke
+study_sample %>%
+  ungroup() %>%
+  select(mood, smoke) %>%
+  filter(!is.na(mood) & !is.na(smoke)) %>%  # remove rows with missing values
+  ggpairs(
+    title = "Correlation: Mood and Smoke",
+    upper = list(continuous = wrap("cor")),       # correlation coefficient
+    diag  = list(continuous = wrap("densityDiag")), # density on diagonal
+    lower = list(continuous = wrap("points"))     # scatterplots
+  )
+```
+
+```{r}
+# Smoke & Unpleasant
+study_sample %>%
+  ungroup() %>%
+  select(smoke, unpleasant) %>%
+  filter(!is.na(smoke) & !is.na(unpleasant)) %>%  # remove rows with missing values
+  ggpairs(
+    title = "Correlation: Smoke and Unpleasant",
+    upper = list(continuous = wrap("cor")),         # correlation coefficient
+    diag  = list(continuous = wrap("densityDiag")), # density on diagonal
+    lower = list(continuous = wrap("points"))       # scatterplots
+  )
+```
+
+```{r}
+# Smoke & Pleasant
+study_sample %>%
+  ungroup() %>%
+  select(smoke, pleasant) %>%
+  filter(!is.na(smoke) & !is.na(pleasant)) %>%  # remove rows with missing values
+  ggpairs(
+    title = "Correlation: Smoke and Pleasant",
+    upper = list(continuous = wrap("cor")),         # correlation coefficient
+    diag  = list(continuous = wrap("densityDiag")), # density on diagonal
+    lower = list(continuous = wrap("points"))       # scatterplots
+  )
+```
+
+
+# Descriptive statistics and visualization
+Statical models used later on are sensitive to the distribution of the variables. We therefore checked the distributions of the variable at a participant level.
+```{r}
+#Density plot of mood variable
+study_sample %>%
+  filter(!is.na(mood)) %>% 
+    ggplot(aes(x=mood, color=factor(participant_id))) +  
+        geom_density(alpha = 1) +
+        theme(legend.position = "none") +
+        labs(title="Density plot of the mood variable")
+```
+```{r}
+#Density plot of smoke variable
+study_sample %>%
+  filter(!is.na(smoke)) %>% 
+    ggplot(aes(x=smoke, color=factor(participant_id))) +  
+        geom_density(alpha = 1) +
+        theme(legend.position = "none") +
+        labs(title="Density plot of the smoke variable")
 ```
