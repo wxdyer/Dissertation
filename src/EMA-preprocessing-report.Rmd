@@ -63,7 +63,7 @@ In certain cases, you might need to use the '!important' declaration to override
 
 # Overview and data collection procedure
 
-This R Markdown file is based on Revol et al. (2024)'s step-by-step guidelines for preprocessing ESM data: [https://preprocess.esmtools.com](https://preprocess.esmtools.com). It includes code adapted from Steps 1 - 4, tailored to preprocess EMA data for a secondary analysis of EMA data from the DVAL project (https://osf.io/nb9ct/overview?view_only=4f777b3907bb47aab6387aaa4353285c. In Part 2 of the study, participants received semi-random prompts 6 times throughout the day within predeterimined 2-hr intervals for three consecutive days, and were instructed to smoke ad-libitum. In Part 6 of the study, the same sampling scheme continued, and participants were informed they could receive daily cash bonuses for day-level cigarette abstinence. Both EMA datasets will be combined for this study's analyses, time-invariant variables (e.g., age, annual income) are pulled from a baseline dataset. The steps to prepare the data for analysis are described below.   
+This R Markdown file is based on Revol et al. (2024)'s step-by-step guidelines for preprocessing ESM data: [https://preprocess.esmtools.com](https://preprocess.esmtools.com). It includes code adapted from Steps 1 - 4, tailored to preprocess EMA data for a secondary analysis of EMA data from the DVAL project (https://osf.io/nb9ct/overview?view_only=4f777b3907bb47aab6387aaa4353285c. In Part 2 of the study, participants received semi-random prompts 6 times throughout the day within predeterimined 2-hr intervals for three consecutive days, and were instructed to smoke ad-libitum. In Part 6 of the study, the same sampling scheme continued for 7 more days, and participants were informed they could receive daily cash bonuses for day-level cigarette abstinence. Both EMA datasets will be combined for this study's analyses, time-invariant variables (e.g., age, annual income) will be pulled from a baseline dataset. The steps to prepare the data for analysis are described below.   
 
 ---
 # Load packages
@@ -126,9 +126,9 @@ dataInfo(file_path = part6_path,
 ```
 # Import data and prepare for preprocessing steps
 
-Below are several steps that will facilitate the application of Revol et al's preprocessing steps. Specifically, only variables and participants relevant to the study will be included in the preprocessing steps, so the data must be subset. Additionally, how to define missing values is specified, variables are formatted to their respective types (e.g., numeric, character), and formatting issues related to cases where participants opted out of a survey are dealt with below. 
+Below are several steps that will facilitate the application of Revol et. al.'s preprocessing steps. Specifically, only variables and participants relevant to the study will be included in the preprocessing steps, so the data must be subset. Additionally, how to define missing values is specified, variables are formatted to their respective types (e.g., numeric, character), and formatting issues related to cases where participants opted out of a survey are dealt with. 
 
-## Modification text:data are subsetted to include only participants who completed Part 2 (Part 6 EMA is already subsetted to include only-completers of Part 6).
+## Modification text: data are subsetted to include only participants who completed Part 2 (Part 6 EMA is already subsetted to include only-completers of Part 6).
 ```{r}
 # Define subset of participants who completed Part2 (3 days of EMA data collection)
 subset_ids <- c(
@@ -541,6 +541,32 @@ if(time_var %in% names(study_sample_full)) {
 # Variable names
 cat("## Variables :", paste(names(study_sample_full), collapse = ", "), "\n")
 ```
+#Examine number of observations sent to participants
+```{r}
+obsno_summary <- study_sample_full %>%
+  group_by(participant_id) %>%
+  summarise(
+    max_obsno = max(obsno, na.rm = TRUE),
+    n_rows = n()
+  )
+obsno_summary
+
+```
+Issue text: Participant 102 submitted 61 total observations, which does not make logical sense because the maximum observations for our study is 60. This issue arose when one of the participant's surveys was interrupted. This interrupted observation contained no usable data, and thus is removed in the step below. 
+
+#Remove interrupted observation from participant 102 and review obsno summary. 
+```{r}
+study_sample_full <- study_sample_full %>%
+  filter(!(participant_id == 102 & session_id == 83))
+
+obsno_summary <- study_sample_full %>%
+  group_by(participant_id) %>%
+  summarise(
+    max_obsno = max(obsno, na.rm = TRUE),
+    n_rows = n()
+  )
+obsno_summary
+```
 
 # To determine the best-suitable data for our analyses, we use logical tests to define which observations are valid so that we can compare the total N of valid observations between the two datasets. The 'valid' observations are the ones where there are no missing values in the variables of interest (i.e., 'mood', 'before_survey', 'smoke'), and two others ('pleasant', 'unpleasant') in function of the branching items (see above). We created a function that can be used later.
 ```{r}
@@ -665,11 +691,26 @@ branch_check <- study_sample_part2_only %>%
 
 branch_check
 ```
+```{r}
+#Check for branch violations
+branch_violations <- study_sample_part2_only %>%
+  summarise(
+    pleasant_when_not_selected =
+      sum(!is.na(pleasant) & before_survey != "It was generally pleasant"),
+    unpleasant_when_not_selected =
+      sum(!is.na(unpleasant) & before_survey != "It was generally unpleasant"),
+    both_present =
+      sum(!is.na(pleasant) & !is.na(unpleasant))
+  )
 
+branch_violations
+```
+Branching integrity was confirmed, as all observations with both pleasant and unpleasant missing corresponded exactly to neutral or missing before_survey responses, and no cases were identified in which a branch variable was displayed when its corresponding condition was not selected or in which both branch variables were simultaneously present.
+
+# We can get a sense for patterns of missingness by identifying the potential relationships or dependencies in missing values between variables (bottom) and the occurrences of each pattern (above).
 ```{r}
 gg_miss_upset(study_sample_full)
 ```
-
 
 # Check variable coherence
 # **Consistency of time-invariant variables.**
@@ -726,19 +767,23 @@ No issues detected.
 Here, our goal is to further characterize the patterns of missing values and address any preliminary issues related to them.
 The following plot gives an overview of the missing values in the dataframe.
 
-
 #### Overview of missing values
 
-```{r, fig.width=7, fig.height=7}
-# Reorder variables
-data = study_sample_full %>% arrange(participant_id, completion_time)
+```{r, fig.width=8, fig.height=10}
+library(ggplot2)
 
-# Overiew of missing values
-vis_miss(study_sample_full)
+data <- study_sample_full %>% 
+  arrange(participant_id, completion_time)
+
+vis_miss(study_sample_full) +
+  theme(
+    plot.margin = margin(t = 10, r = 10, b = 10, l = 10),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
 ```
 We can see multiple patterns and some missingness among the EMA variables.
 
-# Skipped Revol & colleagues' (2024)step to check coherence of missing values in the variables of interest because what would go here -- the missingness pattern between 'before_survey', 'pleasant', and 'unpleasant' were already examined above. 
+# Skipped Revol & colleagues' (2024)step to check coherence of missing values in the variables of interest because what would go here -- the missingness pattern between 'before_survey', 'pleasant', and 'unpleasant' was already examined above. 
 
 # Create time variables
 ```{r}
@@ -756,8 +801,6 @@ study_sample_full <- study_sample_full %>%
     hour   = hour(completion_time),
     minute = minute(completion_time),
     
-    # Observation number within participant
-    obsno = row_number(),
     
     # Day number since first beep
     dayno = as.numeric(
@@ -826,6 +869,7 @@ study_sample_full %>%
 ```
 
 ## Sampling scheme plot and quantity of completed beeps
+
 We proceed to the checking of the actual sample scheme and compare it to the defined one. 
 ```{r, warning=FALSE, message=FALSE}
 study_sample_full %>%
@@ -924,8 +968,6 @@ This section is dedicated to investigating how well participants engaged with th
 
 We check how well participants followed the sampling scheme.
 
-No issues detected.
-
 ```{r}
 # Sampling Scheme plot: this plot illustrates the start times of participants’ valid observations. The x-axis represents the observation number and the y-axis shows the distribution across weekdays and weekends. We see that participant 238 only produces 10/18 valid observations and that occurrences of missing valid observations tend to exist toward the end of the observation period. 
 study_sample_full %>%
@@ -945,50 +987,7 @@ study_sample_full %>%
     x = "Observation number"
   )
 ```
-
-```{r}
-# Sampling scheme plot: this plot illustrates the start times of participants’ valid observations with continuous x-axis over the days of participation.
-
-df <- study_sample_full %>%
-  filter(valid == 1) %>%
-  group_by(participant_id) %>%
-  mutate(
-    start_date = as.Date(min(init_time, na.rm = TRUE))
-  ) %>%
-  ungroup() %>%
-  mutate(
-    continuoustime = as.numeric(
-      difftime(init_time, start_date, units = "mins")
-    )
-  )
-
-# Number of study days
-max_day <- ceiling(max(df$continuoustime, na.rm = TRUE) / 1440)
-
-# Day boundaries (for vertical lines)
-day_boundaries <- seq(0, max_day * 1440, by = 1440)
-
-# Midpoints of each day (for centered labels)
-day_midpoints <- day_boundaries[-length(day_boundaries)] + 720
-
-# Labels
-day_labels <- paste0(seq_len(length(day_midpoints)))
-
-df %>%
-  ggplot(aes(x = continuoustime, y = factor(participant_id))) +
-  geom_point(size = 0.8) +
-  scale_x_continuous(
-    breaks = day_midpoints,
-    labels = day_labels
-  ) +
-  geom_vline(xintercept = day_boundaries) +
-  labs(
-    title = "Continuous sampling scheme of the valid observations",
-    y = "Participant_id",
-    x = "Day number"
-  )
-```
-
+No issues detected.
 
 ```{r}
 # Number of valid response over 'obsno' and it shows a slight decrease over time.
@@ -1097,23 +1096,24 @@ study_sample_full_intervals %>%
     )
 ```
 ## Compliance Rate
-We computed compliance rate scores for participants. We based this off the valid observation definition above and that each participant should have 18 valid observations.
+We computed participant compliance as the proportion of valid EMA observations out of 60 possible prompts per participant, based on the valid observation definition described above.
 ```{r}
-obsno_max = 18
-study_sample_full$compliance = ave(study_sample_full$valid, study_sample_full$participant_id, FUN=function(x) sum(x, na.rm=TRUE)) / obsno_max
-
 study_sample_full %>%
-    group_by(participant_id) %>% slice(1) %>%    # Keep one row per participant
-    ggplot(aes(y=compliance, x=factor(participant_id))) +
-        geom_col(position = "dodge") +
-        labs(title="Compliance score of each participant",
-            y="Compliance",x="Participant id")
-study_sample_full %>%
-    group_by(participant_id) %>% slice(1) %>%    # Keep one row per participant
-    ggplot(aes(x=compliance)) +
-        geom_histogram() +
-        labs(title="Histogram of the compliance score",
-            y="Number of participant",x="Compliance")
+  group_by(participant_id) %>%
+  slice(1) %>%
+  ggplot(aes(x = compliance)) +
+  geom_histogram(binwidth = 0.05, boundary = 0) +
+  scale_x_continuous(
+    limits = c(0, 1),
+    breaks = seq(0, 1, by = 0.1),
+    labels = scales::percent_format(accuracy = 1)
+  ) +
+  labs(
+    title = "Distribution of Participant Compliance",
+    x = "Compliance (% of 60 possible observations)",
+    y = "Number of Participants"
+  ) +
+  theme_minimal()
 ```
 
 # Step 4: Compute and transform variables
