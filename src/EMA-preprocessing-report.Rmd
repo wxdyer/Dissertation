@@ -501,27 +501,6 @@ check_validity <- function(df) {
   
   as.integer(is_valid)
 }
-# Apply validity function to both datasets to see which has more valid observations
-study_sample_part2_only$valid <- check_validity(study_sample_part2_only)
-study_sample$valid       <- check_validity(study_sample)
-
-# Compare between datasets
-comparison_overall <- tibble(
-  Dataset = c("Part 2 Only", "Full Sample"),
-  Total_Observations = c(
-    nrow(study_sample_part2_only),
-    nrow(study_sample)
-  ),
-  Valid_Observations = c(
-    sum(study_sample_part2_only$valid == 1, na.rm = TRUE),
-    sum(study_sample$valid == 1, na.rm = TRUE)
-  )
-) %>%
-  mutate(
-    Percent_Valid = round(100 * Valid_Observations / Total_Observations, 2)
-  )
-
-comparison_overall
 ```
 The full sample contains more available cases for analysis than the Part 2 only sample, despite attrition. The remaining data preprocessing and characteristics reporting will reflect actions performed on the full dataset (study_sample).
 
@@ -592,36 +571,22 @@ cat("Duplicated answer sets:", nrow(dup_answers), "\n")
 - n of observations for which both 'unpleasant' and 'pleasant' are missing (N=648) correspond to the n of observations for which participants reported 'It was generally neutral' (N=549; above) plus the n missinenss for the 'before_survey' variable (N=99; above), indicating no problems occurred at this step.
 
 ```{r}
-# Count the number of observations for each before_survey category
-branch_check <- study_sample_part2_only %>%
+# Check branching integrity for pleasant/unpleasant display
+study_sample %>%
   mutate(
-    # Flag cases where both numeric branching variables are missing
-    both_missing = is.na(pleasant) & is.na(unpleasant)
+    # Identify observations where both branch variables are missing
+    both_missing = is.na(pleasant) & is.na(unpleasant),
+    # Identify observations where branch variables are incorrectly displayed
+    pleasant_display_error = (before_survey != "It was generally pleasant") & !is.na(pleasant),
+    unpleasant_display_error = (before_survey != "It was generally unpleasant") & !is.na(unpleasant)
   ) %>%
   summarise(
-    n_pleasant_displayed = sum(!is.na(pleasant) & before_survey == "It was generally pleasant"),
-    n_unpleasant_displayed = sum(!is.na(unpleasant) & before_survey == "It was generally unpleasant"),
-    n_neutral_branch = sum(both_missing & before_survey == "It was generally neutral"),
-    n_both_missing_total = sum(both_missing),
-    total_obs = n()
+    n_both_missing = sum(both_missing),
+    n_pleasant_display_error = sum(pleasant_display_error),
+    n_unpleasant_display_error = sum(unpleasant_display_error)
   )
-
-branch_check
 ```
-```{r}
-#Check for branch violations
-branch_violations <- study_sample_part2_only %>%
-  summarise(
-    pleasant_when_not_selected =
-      sum(!is.na(pleasant) & before_survey != "It was generally pleasant"),
-    unpleasant_when_not_selected =
-      sum(!is.na(unpleasant) & before_survey != "It was generally unpleasant"),
-    both_present =
-      sum(!is.na(pleasant) & !is.na(unpleasant))
-  )
 
-branch_violations
-```
 Branching integrity was confirmed, as all observations with both pleasant and unpleasant missing corresponded exactly to neutral or missing before_survey responses, and no cases were identified in which a branch variable was displayed when its corresponding condition was not selected or in which both branch variables were simultaneously present.
 
 # We can get a sense for patterns of missingness by identifying the potential relationships or dependencies in missing values between variables (bottom) and the occurrences of each pattern (above).
@@ -888,6 +853,8 @@ We check how well participants followed the sampling scheme.
 ```{r}
 # Sampling Scheme plot: this plot illustrates the start times of participants’ valid observations. The x-axis represents the observation number and the y-axis shows the distribution across weekdays and weekends. We see that participant 238 only produces 10/18 valid observations and that occurrences of missing valid observations tend to exist toward the end of the observation period. 
 study_sample %>%
+  # Compute validity dynamically using the function
+  mutate(valid = check_validity(.)) %>%
   filter(valid == 1) %>%
   mutate(
     weekday = ifelse(
@@ -909,6 +876,7 @@ No issues detected.
 ```{r}
 # Number of valid response over 'obsno' and it shows a slight decrease over time.
 study_sample %>% 
+   mutate(valid = check_validity(.)) %>%
   filter(valid==1) %>% 
   group_by(obsno) %>% summarize(n = n()) %>%
   ggplot(aes(x=obsno,y=n)) +
@@ -919,6 +887,7 @@ study_sample %>%
 ```{r}
 # Time of day beeps were started and (and valid).
 study_sample %>%
+   mutate(valid = check_validity(.)) %>%
   filter(valid == 1) %>%
   mutate(
     weekday = ifelse(
@@ -945,6 +914,8 @@ study_sample %>%
 **Hour at which the beeps were started (in blue) and missed (in red):**
 ```{r}
 df_interact <- study_sample %>%
+  # Compute validity using the function
+  mutate(valid = check_validity(.)) %>%
   mutate(
     hour = hour(init_time),
     sent_ = !is.na(init_time),
@@ -975,6 +946,7 @@ df_interact %>%
 Compute delay to fill  variables. Revol & colleagues' (2024) preprocessing steps for computing delay to fill is not possible because we lack a 'sent' variable. Will be only used for the creation of plot and won't be exported in the preprocessed dataframe. We see most of the valid surveys are submitted in under five minutes, which is expected. 
 ```{r}
 study_sample <- study_sample %>%
+   mutate(valid = check_validity(.)) %>%
   mutate(
     daily_end_min   = as.numeric(difftime(completion_time, init_time, units = "mins"))
   )
@@ -995,6 +967,7 @@ No issues detected.
 ```{r}
 # Compute time intervals between consecutive beeps within a day
 study_sample_intervals <- study_sample %>%
+   mutate(valid = check_validity(.)) %>%
   filter(valid == 1) %>% 
   arrange(participant_id, obsno) %>%
   group_by(participant_id, dayno) %>%
