@@ -1,5 +1,5 @@
 ---
-title: "EMA Preprocessing: Revol et. al. 2024 Steps 1 - 4"
+title: "EMA Preprocessing Report"
 author:
   - name: Walter G. Dyer, wdyer@psu.edu, Penn State University
 date: "`r Sys.Date()`"
@@ -11,7 +11,7 @@ output:
       toc_depth: 2
 ---
 
-<!-- Javascript code to zoom in and out in the plots. -->s
+<!-- Javascript code to zoom in and out in the plots. -->
 <!-- Code from Radovan Miletić: https://stackoverflow.com/questions/56361986/zoom-function-in-rmarkdown-html-plot -->
 <script src = "https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
 <script type="text/javascript">
@@ -63,7 +63,7 @@ In certain cases, you might need to use the '!important' declaration to override
 
 # Overview and data collection procedure
 
-This R Markdown file is based on Revol et al. (2024)'s step-by-step guidelines for preprocessing ESM data: [https://preprocess.esmtools.com](https://preprocess.esmtools.com). It includes code adapted from Steps 1 - 4, tailored to preprocess EMA data for a secondary analysis of EMA data from the DVAL project (https://osf.io/nb9ct/overview?view_only=4f777b3907bb47aab6387aaa4353285c. In Part 2 of the study, participants received semi-random prompts 6 times throughout the day within predeterimined 2-hr intervals for three consecutive days, and were instructed to smoke ad-libitum. In Part 6 of the study, the same sampling scheme continued for 7 more days, and participants were informed they could receive daily cash bonuses for day-level cigarette abstinence. Both EMA datasets will be combined for this study's analyses, time-invariant variables (e.g., age, annual income) will be pulled from a baseline dataset. The steps to prepare the data for analysis are described below.   
+This R Markdown file is based on Revol et al. (2024)'s step-by-step guidelines for preprocessing ESM data: [https://preprocess.esmtools.com](https://preprocess.esmtools.com). It includes code adapted from Steps 1 - 4, tailored to preprocess EMA data for a secondary analysis of EMA data from the DVAL project (https://osf.io/nb9ct/overview?view_only=4f777b3907bb47aab6387aaa4353285c). In Part 2 of the study, participants received semi-random prompts 6 times throughout the day within predeterimined 2-hr intervals for three consecutive days, and were instructed to smoke at their normal rate. In Part 6 of the study, the same sampling scheme continued for 7 more days, and participants were informed they could receive daily cash bonuses for day-level cigarette abstinence. Both EMA datasets will be combined for this study's analyses, time-invariant variables (e.g., age, annual income) will be pulled from a baseline dataset. The steps to prepare the data for analysis are described below.   
 
 ---
 # Load packages
@@ -128,7 +128,21 @@ dataInfo(file_path = part6_path,
 
 Below are several steps that will facilitate the application of Revol et. al.'s preprocessing steps. Specifically, only variables and participants relevant to the study will be included in the preprocessing steps, so the data must be subset. Additionally, how to define missing values is specified, variables are formatted to their respective types (e.g., numeric, character), and formatting issues related to cases where participants opted out of a survey are dealt with. 
 
-## Modification text: data are subsetted to include only participants who completed Part 2 (Part 6 EMA is already subsetted to include only-completers of Part 6).
+`r button(text = "Description")` 
+
+`r txt('esm-mod','Modification',"Data are subsetted to include only participants who completed Part 2 (Part 6 EMA is already subsetted to include only-completers of Part 6).")`
+
+`r txt('esm-mod','Modification',"EMA variables relevant to the study are extracted, and missingness is standardized across variables.")`
+
+`r txt(id='esm-issue',title='Issue',text="Instances where participants opted out were reported by the literal text 'opted out' in the raw dataset, making the data incompatible with the command to format the variable as numeric.",FALSE)` 
+`r txt('esm-mod','Modification',"In order to maintain these data but in a format compatible with numeric formatting, a variable to track opted out instances is created to check whether further actions to account for these cases must be taken.")` 
+
+`r txt(id='esm-issue',title='Issue',text="The variable smoked_since_last_survey gave participants the option to select '6+' which, while useful for other analyses, prevents us from formatting the variable as numeric.",FALSE)`
+`r txt('esm-mod','Modification',"The chunk below converts '6+' to 6 for the variable smoked_since_last_survey.")`
+
+`r txt(id='esm-issue',title='Issue',text="Continuous variables must be formatted as numeric.",FALSE)`
+`r txt('esm-mod','Modification',"The chunk below formats continuous variables as numeric for later analyses.")`
+
 ```{r}
 # Define subset of participants who completed Part2 (3 days of EMA data collection)
 subset_ids <- c(
@@ -140,25 +154,8 @@ subset_ids <- c(
   329, 332, 340, 341, 342, 344, 346, 349, 351, 356, 362, 363, 369, 370, 
   372, 381, 383, 393, 394, 399, 416, 423, 427, 428, 430
 )
-```
 
-## Issue text: The raw dataset is quite large and includes several variables irrelevant to this study. Additionally, missinginess is inconsistently coded upon data import.
-## Modification text: EMA variables relevant to the study are extracted, and missingness is standardized across variables.
-
-## Issue text: The variable smoked_since_last_survey gave participants the option to select '6+' which, while useful for other analyses, prevents us from formatting the variable as numeric.
-## Modification text: The chunk below also converts '6+' to 6 for the variable smoked_since_last_survey.
-
-## Issue text: Instances where participants opted out were reported by the literal text 'opted out' in the raw dataset, making the data incompatible with the command to format the variable as numeric.
-## Modification text: In order to maintain these data but in a format compatible with numeric formatting, a variable to track opted out instances is created to check whether further actions to account for these cases must be taken.
-
-## Issue text: Variables are all in character format upon import.
-## Modification text: The below chunk also formats numeric variables as numeric.")`
-
-Note: the below code also includes counts of missingness before and after the data modifications. No data were lost during the modification process.
-```{r}
-# -----------------------------
-# Define common EMA variables
-# -----------------------------
+# Define EMA variables to extract
 ema_vars <- c(
   "mood",
   "smoke",
@@ -173,9 +170,8 @@ ema_vars <- c(
   "init_time"
 )
 
-# -----------------------------
 # Function to preprocess EMA data
-# -----------------------------
+
 preprocess_ema <- function(path, subset_vector = NULL) {
   
   df <- read_csv(
@@ -247,14 +243,16 @@ ema_master <- bind_rows(
 
 ```
 
-# Modification text: format time variables as POSIXct."
+`r txt(id='esm-issue',title='Issue',text="Time variables must be reformatted.",FALSE)`
+`r txt('esm-mod','Modification',"The chunk below formats time variables as numeric for later POSIXct")`
+
 ```{r}
 ema_master <- ema_master %>%
   mutate(init_time = as.POSIXct(init_time, tz = "UTC"),
          completion_time = as.POSIXct(completion_time, tz = "UTC"))
 ```
 
-# Inspect opting out behavior by participant
+`r txt('esm-inspect','Inspection',"opting out behavior by participant",FALSE)` 
 ```{r}
 #mood
 ema_master %>%
@@ -290,10 +288,14 @@ ema_master <- ema_master %>%
   select(-ends_with("_optout"))
 ```
 
+`r endbutton()` 
 
 The EMA data are now prepared for Revol et. al.'s preprocessing workflow but must be merged with the parent study's baseline dataset for time-invariant variables (e.g., covariates). The below code prepares the baseline data for merge.
 
-#Modification text: Baseline variables are preprocessed according to survey author guidelines (see parent study online repository for full list of baseline measures) and planned analyses.
+`r button(text = "Description")` 
+
+`r txt(id='esm-issue',title='Issue',text="Baseline data are raw. Some measures of time-invariant characteristics (e.g., Fagerstrom Test of Cigarette Dependence) need scoring and some variables require renaming/relabeling.")` 
+`r txt('esm-mod','Modification',"Baseline variables are preprocessed according to survey author guidelines (see parent study online repository for full list of baseline measures) and planned analyses.")`
 ```{r}
 # Define paths to input data
 Apath <- here("data", "QuestionnairesA.xlsx")
@@ -383,10 +385,15 @@ baseline_clean <- baseline %>%
     panas_neg
   )
 ```
-'baseline_clean' is the dataframe with all baseline variables, now prepared for merging with the EMA data.
 
-##Issue text: the EMA data alone do not contain all participant data needed for analyses. They must be combined with baseline data.
-##Modification text: The EMA and Baseline Data are merged, and baseline variables listed after the EMA variables.
+`r endbutton()` 
+
+Baseline data are now prepared for merging with the EMA data.
+
+`r txt(id='esm-issue',title='Issue',text="he EMA data alone do not contain all participant data needed for analyses. They must be combined with baseline data.")`
+`r txt('esm-mod','Modification',"The EMA and Baseline Data are merged in the order: EMA variables, then Baseline variables.")`
+
+`r button(text = "Supplementary")` 
 
 ```{r}
 # Specify baseline variables
@@ -413,17 +420,7 @@ study_sample <- ema_master %>%
     all_of(baseline_vars)
   )
 ```
-
-
-# Create obsno variable representing the serial order in which a given observation occurs.
-
-```{r}
-study_sample <- study_sample %>%
-  arrange(participant_id, completion_time) %>%
-  group_by(participant_id) %>%
-  mutate(obsno = row_number()) %>%
-  ungroup()
-```
+`r endbutton()` 
 
 study_sample dataset meta-info:
 ```{r}
@@ -458,34 +455,12 @@ if(time_var %in% names(study_sample)) {
 # Variable names
 cat("## Variables :", paste(names(study_sample), collapse = ", "), "\n")
 ```
-#Examine number of observations sent to participants
-```{r}
-obsno_summary <- study_sample %>%
-  group_by(participant_id) %>%
-  summarise(
-    max_obsno = max(obsno, na.rm = TRUE),
-    n_rows = n()
-  )
-obsno_summary
 
-```
-Issue text: Participant 102 submitted 61 total observations, which does not make logical sense because the maximum observations for our study is 60. This issue arose when one of the participant's surveys was interrupted. This interrupted observation contained no usable data, and thus is removed in the step below. 
 
-#Remove interrupted observation from participant 102 and review obsno summary. 
-```{r}
-study_sample <- study_sample %>%
-  filter(!(participant_id == 102 & session_id == 83))
 
-obsno_summary <- study_sample %>%
-  group_by(participant_id) %>%
-  summarise(
-    max_obsno = max(obsno, na.rm = TRUE),
-    n_rows = n()
-  )
-obsno_summary
-```
+# Flag (in)valid observations
 
-# To determine the best-suitable data for our analyses, we use logical tests to define which observations are valid so that we can compare the total N of valid observations between the two datasets. The 'valid' observations are the ones where there are no missing values in the variables of interest (i.e., 'mood', 'before_survey', 'smoke'), and two others ('pleasant', 'unpleasant') in function of the branching items (see above). We created a function that can be used later.
+We use logical tests to define which observations are valid so that we can compare the total N of valid observations between the two datasets. The 'valid' observations are the ones where there are no missing values in the variables of interest (i.e., 'mood', 'before_survey', 'smoke'), and two others that branch off of the variable 'before_survey' ('pleasant', 'unpleasant') . Below we create a validity function that can be used to filter data later.
 ```{r}
 # Create validity function 
 check_validity <- function(df) {
@@ -502,18 +477,18 @@ check_validity <- function(df) {
   as.integer(is_valid)
 }
 ```
-The full sample contains more available cases for analysis than the Part 2 only sample, despite attrition. The remaining data preprocessing and characteristics reporting will reflect actions performed on the full dataset (study_sample).
+
 
 ## First glimpse
+
 The following chunk helps to have a first insight on what the dataset looks like.
 
+`r button(text = "Description")` 
 ```{r}
 dim(study_sample)
-```
-```{r}
+
 head(study_sample)
 ```
-
 ```{r}
 tail(study_sample)
 ```
@@ -527,7 +502,43 @@ summary(study_sample)
 #Revol and colleagues' (2024) step for renaming and relabeling step skipped here because it was completed in previous steps.
 
 ## Duplication
-No issues detected.
+Participant #102 had two observations within a single observation 2-hr observation window due to a time-out issue. The time-out observation contained no data and was removed.
+
+`r button(text = "Description")` 
+```{r}
+# Create obsno variable representing the serial order in which a given observation occurs.
+study_sample <- study_sample %>%
+  arrange(participant_id, completion_time) %>%
+  group_by(participant_id) %>%
+  mutate(obsno = row_number()) %>%
+  ungroup()
+
+# Examine number of observations sent to participants
+obsno_summary <- study_sample %>%
+  group_by(participant_id) %>%
+  summarise(
+    max_obsno = max(obsno, na.rm = TRUE),
+    n_rows = n()
+  )
+obsno_summary
+```
+
+
+`r txt(id='esm-issue',title='Issue',text=" The above table reveals that participant 102 submitted 61 total observations, which does not make logical sense because the maximum observations a participant can submit for our study is 60. This issue arose when one of their surveys was interrupted and resent to the participant, but both the interrupted and the actual observation were saved. This interrupted observation contained no usable data.")`
+`r txt('esm-mod','Modification',"The following code removes the interrupted observation from participant 102 and revisits obsno summary to ensure Participant #102's max obsno == 60.")`
+
+```{r}
+study_sample <- study_sample %>%
+  filter(!(participant_id == 102 & session_id == 83))
+
+obsno_summary <- study_sample %>%
+  group_by(participant_id) %>%
+  summarise(
+    max_obsno = max(obsno, na.rm = TRUE),
+    n_rows = n()
+  )
+obsno_summary
+```
 
 **Look for duplicated rows:** the dataframes do not have duplicated rows.
 ```{r}
@@ -562,7 +573,13 @@ dup_answers <- study_sample %>%
 cat("Duplicated answer sets:", nrow(dup_answers), "\n")
 ```
 
+`r endbutton()` 
+
 ## Branching items
+
+No issues detected.
+
+`r button(text = "Description")` 
 
 **Branching items are consistent:**
 
@@ -589,12 +606,13 @@ study_sample %>%
 
 Branching integrity was confirmed, as all observations with both pleasant and unpleasant missing corresponded exactly to neutral or missing before_survey responses, and no cases were identified in which a branch variable was displayed when its corresponding condition was not selected or in which both branch variables were simultaneously present.
 
-# We can get a sense for patterns of missingness by identifying the potential relationships or dependencies in missing values between variables (bottom) and the occurrences of each pattern (above).
-```{r}
-gg_miss_upset(study_sample)
-```
+`r endbutton()` 
 
 # Check variable coherence
+No issues detected.
+
+`r button(text = "Description")` 
+
 # **Consistency of time-invariant variables.**
 ```{r}
 study_sample %>%
@@ -642,11 +660,12 @@ study_sample %>%
   summarise(n_cigsperday_values = n_distinct(cigsperday)) %>%
   filter(n_cigsperday_values > 1)
 ```
-No issues detected.
 
-## Further analysis of missing values
+`r endbutton()` 
 
-Here, our goal is to further characterize the patterns of missing values and address any preliminary issues related to them.
+## ## First missing values analysis
+
+Here, our goal is to gain an overview of the patterns of missing values and address any preliminary issues related to them.
 The following plot gives an overview of the missing values in the dataframe.
 
 #### Overview of missing values
@@ -665,9 +684,18 @@ vis_miss(study_sample) +
 ```
 We can see multiple patterns and some missingness among the EMA variables.
 
-# Skipped Revol & colleagues' (2024)step to check coherence of missing values in the variables of interest because what would go here -- the missingness pattern between 'before_survey', 'pleasant', and 'unpleasant' was already examined above. 
+# We can get a sense for patterns of missingness by identifying the potential relationships or dependencies in missing values between variables (bottom) and the occurrences of each pattern (top).
+```{r}
+gg_miss_upset(study_sample)
+```
+
+# Skipped Revol & colleagues' (2024) step to check coherence of missing values in the variables of interest because what would go here -- the missingness pattern between 'before_survey', 'pleasant', and 'unpleasant' was already examined above. 
 
 # Create time variables
+
+Our analyses require the creation of time-related variables. We already created the 'obsno' variable above, which represents the serial order in which a given observation occurs. 
+
+`r txt('esm-mod','Modification',"Below, we create 'dayno' (day since first beep was sent), 'duration' representing the total length of one's participation, and 'beepno' which is the observation number within a given day.")`
 ```{r}
 study_sample <- study_sample %>%
   
@@ -684,7 +712,7 @@ study_sample <- study_sample %>%
     minute = minute(completion_time),
     
     
-    # Day number since first beep
+    # Day number since first beep (day-level)
     dayno = as.numeric(
       difftime(
         as.Date(completion_time),
@@ -693,7 +721,7 @@ study_sample <- study_sample %>%
       )
     ) + 1,
     
-    # Study duration in days
+    # Study duration in days (time-invariant)
     duration = as.numeric(
       difftime(
         as.Date(max(completion_time, na.rm = TRUE)),
@@ -722,6 +750,7 @@ This section is dedicated to checking and solving issues due to inconsistencies 
 
 Overview when the beeps were completed in a calendar format
 
+`r button(text = "Description")` 
 ```{r}
 study_sample %>%
   filter(!is.na(completion_time)) %>%    
@@ -749,6 +778,7 @@ study_sample %>%
     axis.text.x = element_text(angle = 45, hjust = 1)
   )
 ```
+`r endbutton()` 
 
 ## Sampling scheme plot and quantity of completed beeps
 
@@ -801,7 +831,12 @@ study_sample %>%
       plot.title = element_text(face = "bold", size = 12)
     )
 ```
+
 ## Coherence timestamps
+
+No issues detected.
+
+`r button(text = "Description")` 
 
 We check whether there is timestamp incoherence within observations (e.g., an observation with 'start' time after the 'end' time) or between observations (e.g., an observation that was scheduled after another one but with a 'start' time that is before).
 ```{r}
@@ -838,7 +873,8 @@ df %>%
   as.data.frame()
 
 ```
-No issues detected.
+
+`r endbutton()` 
 
 ## Revol et. al.'s (2024) steps to examine time and delay to send steps were not possible with our dataset, given we lack a 'sent' variable. These steps were designed to determine whether the survey sending timing adhered to the sampling scheme, and the tests that are feasible in our dataset indicate the sampling scheme was adhered to. 
 
@@ -847,6 +883,10 @@ No issues detected.
 This section is dedicated to investigating how well participants engaged with the ESM study looking particularly for problematic patterns of behaviors (e.g., invalid observations, response time, careless responding).
 
 ## Sampling scheme, quantity of beeps and time started
+
+No issues detected.
+
+`r button(text = "Supplementary")` 
 
 We check how well participants followed the sampling scheme.
 
@@ -871,7 +911,8 @@ study_sample %>%
     x = "Observation number"
   )
 ```
-No issues detected.
+
+We check the volume of valid observations over time.
 
 ```{r}
 # Number of valid response over 'obsno' and it shows a slight decrease over time.
@@ -910,7 +951,14 @@ study_sample %>%
 
 ```
 
+`r endbutton()` 
+
 ## Number of interactions
+
+No issue detected. 
+
+`r button(text = "Supplementary")` 
+
 **Hour at which the beeps were started (in blue) and missed (in red):**
 ```{r}
 df_interact <- study_sample %>%
@@ -941,9 +989,13 @@ df_interact %>%
     fill = "Interaction"
   )
 ```
+
+`r endbutton()` 
+
 ## Delays
 
-Compute delay to fill  variables. Revol & colleagues' (2024) preprocessing steps for computing delay to fill is not possible because we lack a 'sent' variable. Will be only used for the creation of plot and won't be exported in the preprocessed dataframe. We see most of the valid surveys are submitted in under five minutes, which is expected. 
+Compute delay to fill  variables. Revol & colleagues' (2024) preprocessing steps for computing delay to fill is not possible because we lack a 'sent' variable. Yet, we can still see most of the valid surveys are submitted in under five minutes, which is expected. 
+
 ```{r}
 study_sample <- study_sample %>%
    mutate(valid = check_validity(.)) %>%
@@ -961,9 +1013,13 @@ study_sample %>%
       x = "Duration in minutes"
     )
 ```
+
 #### Interval 2 beeps
 
 No issues detected.
+
+`r button(text = "Supplementary")` 
+
 ```{r}
 # Compute time intervals between consecutive beeps within a day
 study_sample_intervals <- study_sample %>%
@@ -985,8 +1041,13 @@ study_sample_intervals %>%
       x = "Delay (minutes)"
     )
 ```
+
+`r button(text = "Supplementary")` 
+
 ## Compliance Rate
+
 We computed participant compliance as the proportion of valid EMA observations out of the maximum possible prompts per participant. For participants who only completed Part 2 of the parent study, max obsno == 18. For participants who completed the Parts 2 and 6,of the parent study, max obsno == 60. We apply the valid function from earlier to only consider valid observations in our compliance calculation. 
+
 ```{r}
 #Compliance audit
 compliance_df <- study_sample %>%
@@ -1040,7 +1101,7 @@ compliance_audit %>%
 
 This section is dedicated to computing and modifying variables of interest that will later be used in visualization and statistical analysis.
 
-# Modification: Person-level mean and person-mean-centered versions of variables that will be used in analyses.`r txt('esm-mod','Modification',"the 'pos_aff' and 'neg_aff' variables are person-mean centered.")` 
+`r txt('esm-mod','Modification',"Person-level mean and person-mean-centered versions of variables that will be used in analyses.")` 
 ```{r}
 # Variables to process
 vars <- c("mood", "smoke", "unpleasant", "prior_mood", "pleasant")
