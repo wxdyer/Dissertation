@@ -428,8 +428,95 @@ study_sample <- ema_master %>%
     # Then baseline variables at the end
     all_of(baseline_vars)
   )
+# Create obsno variable representing the serial order of observations within-participant, to prepare for biochemical abstinence verification data.
+study_sample <- study_sample %>%
+  arrange(participant_id, completion_time) %>%
+  group_by(participant_id) %>%
+  mutate(obsno = row_number()) %>%
+  ungroup()
 ```
 
+`r endbutton()` 
+
+Baseline and EMA data are now merged.
+
+`r txt(id='esm-issue',title='Issue',text="Daily biochemical abstinence verification (i.e., breath Carbon Monoxide (CO) concentration) data must be included for validity checks. ",FALSE)`
+
+`r txt('esm-mod','Modification',"Biochemical abstinence verification data are read in, cleaned, and merged with the EMA+baseline dataset.")`
+
+```{r}
+
+# Import Part 6 CO data sheet
+co_path <- here("data/DVAL_CO-video_data_full.xlsx")
+sheet_name <- "Video info - Part 6 (7-day)"
+
+part6_raw <- read_excel(co_path, sheet = sheet_name,
+                        na = c("N/A", "n/a")) %>%
+  clean_names() %>%
+  select(-notes, -verified)
+
+# Pivot wide -> long
+part6_long <- part6_raw %>%
+  pivot_longer(
+    cols = matches("^day_\\d+_"),
+    names_to = c("day_temp", "measure"),
+    names_pattern = "day_(\\d+)_(.+)",
+    values_drop_na = FALSE
+  ) %>%
+  mutate(
+    co_day = as.integer(day_temp) + 3
+  ) %>%
+  select(participant_id, co_day, measure, value) %>%
+  pivot_wider(
+    names_from = measure,
+    values_from = value
+  ) %>%
+  rename(
+    co_date = date,
+    co_time_recorded = time_recorded,
+    co_level = co_level,
+    co_state_smoked = state_smoked,
+    co_correct_procedure = correct_procedure
+  )
+
+# Convert types and combine date + time
+part6_long <- part6_long %>%
+  mutate(
+    co_date = as.Date(co_date),
+    co_time_recorded = parse_date_time(co_time_recorded, orders = "I:M p"),
+    co_level = as.numeric(co_level),
+    co_state_smoked = ifelse(tolower(co_state_smoked) %in% c("yes", "y", "true"), TRUE,
+                             ifelse(tolower(co_state_smoked) %in% c("no", "n", "false"), FALSE, NA)),
+    co_correct_procedure = ifelse(tolower(co_correct_procedure) %in% c("yes", "y", "true"), TRUE,
+                                  ifelse(tolower(co_correct_procedure) %in% c("no", "n", "false"), FALSE, NA)),
+    co_vid_time = as.POSIXct(
+      paste(co_date, format(co_time_recorded, "%I:%M %p")),
+      format = "%Y-%m-%d %I:%M %p",
+      tz = "America/New_York"
+    )
+  ) %>%
+  select(participant_id, co_day, co_date, co_time_recorded,
+         co_level, co_state_smoked, co_correct_procedure, co_vid_time)
+
+# Expand full co_day 4–10 for all participants
+participants <- unique(study_sample$participant_id)
+
+co_data <- expand.grid(
+  participant_id = participants,
+  co_day = 4:10
+) %>%
+  left_join(part6_long, by = c("participant_id", "co_day")) %>%
+  arrange(participant_id, co_day)
+
+# Merge CO data with EMA dataset
+study_sample <- study_sample %>%
+  left_join(co_data, by = c("participant_id", "dayno" = "co_day"))
+
+# Clean up intermediate object
+rm(part6_long)
+```
+
+`r button(text = "Description")`
 `r endbutton()` 
 
 # Flag (in)valid observations
@@ -487,13 +574,6 @@ Revol and colleagues' (2024) step for renaming and relabeling step skipped here 
 
 `r button(text = "Description")` 
 ```{r}
-# Create obsno variable representing the serial order of observations within-participant
-study_sample <- study_sample %>%
-  arrange(participant_id, completion_time) %>%
-  group_by(participant_id) %>%
-  mutate(obsno = row_number()) %>%
-  ungroup()
-
 # Examine number of observations sent to participants
 obsno_summary <- study_sample %>%
   group_by(participant_id) %>%
