@@ -101,7 +101,7 @@ library(hms)
 
 # Step 1: Import data and preliminary preprocessing
 
-This section is dedicated to the first look at the data, the merging of data sources the first basic preprocessing methods (e.g., duplicates, branching items check), and checking the variable consistency when the data has just been imported.
+This section is dedicated to the first look at the data, the merging of data sources the first basic preprocessing methods (e.g., duplicates, branching items check), and checking the variable consistency when the data have just been imported.
 
 Import the data: 
 ```{r}
@@ -428,11 +428,20 @@ study_sample <- ema_master %>%
     # Then baseline variables at the end
     all_of(baseline_vars)
   )
-# Create obsno variable representing the serial order of observations within-participant, to prepare for biochemical abstinence verification data.
+# Create 'obsno' variable, representing the serial order of observations within-participant, and 'dayno' variable, representing the days since first completed beep. This is to prepare for biochemical abstinence verification data merging.
 study_sample <- study_sample %>%
   arrange(participant_id, completion_time) %>%
   group_by(participant_id) %>%
-  mutate(obsno = row_number()) %>%
+  mutate(
+    obsno = row_number(),
+    dayno = as.numeric(
+      difftime(
+        as.Date(completion_time),
+        as.Date(min(completion_time, na.rm = TRUE)),
+        units = "days"
+      )
+    ) + 1
+  ) %>%
   ungroup()
 ```
 
@@ -444,8 +453,9 @@ Baseline and EMA data are now merged.
 
 `r txt('esm-mod','Modification',"Biochemical abstinence verification data are read in, cleaned, and merged with the EMA+baseline dataset.")`
 
-```{r}
+`r button(text = "Description")`
 
+```{r}
 # Import Part 6 CO data sheet
 co_path <- here("data/DVAL_CO-video_data_full.xlsx")
 sheet_name <- "Video info - Part 6 (7-day)"
@@ -455,22 +465,22 @@ part6_raw <- read_excel(co_path, sheet = sheet_name,
   clean_names() %>%
   select(-notes, -verified)
 
+# Temporarily coerce mixed-type columns to character and trim whitespace
+co_level_cols <- grep("_co_level$", names(part6_raw), value = TRUE)
+time_cols <- grep("_time_recorded$", names(part6_raw), value = TRUE)
+
+part6_raw <- part6_raw %>%
+  mutate(across(all_of(c(co_level_cols, time_cols)), as.character)) %>%
+  mutate(across(all_of(time_cols), ~ trimws(.)))
+
 # Pivot wide -> long
 part6_long <- part6_raw %>%
   pivot_longer(
-    cols = matches("^day_\\d+_"),
-    names_to = c("day_temp", "measure"),
-    names_pattern = "day_(\\d+)_(.+)",
-    values_drop_na = FALSE
+    cols = -participant_id,
+    names_to = c("co_day", ".value"),
+    names_pattern = "day_(\\d+)_(.+)"
   ) %>%
-  mutate(
-    co_day = as.integer(day_temp) + 3
-  ) %>%
-  select(participant_id, co_day, measure, value) %>%
-  pivot_wider(
-    names_from = measure,
-    values_from = value
-  ) %>%
+  mutate(co_day = as.integer(co_day) + 3) %>%
   rename(
     co_date = date,
     co_time_recorded = time_recorded,
@@ -479,20 +489,28 @@ part6_long <- part6_raw %>%
     co_correct_procedure = correct_procedure
   )
 
-# Convert types and combine date + time
+# Convert types and combine date + time (suppress warnings introduced when raw missing cases represented by the literal text "N/A" get converted to actual missing cases)
 part6_long <- part6_long %>%
   mutate(
+    co_level = suppressWarnings(as.numeric(co_level)),
+    co_time_parsed = suppressWarnings(
+      parse_date_time(co_time_recorded, orders = "I:M p", tz = "UTC")
+    ),
     co_date = as.Date(co_date),
-    co_time_recorded = parse_date_time(co_time_recorded, orders = "I:M p"),
-    co_level = as.numeric(co_level),
-    co_state_smoked = ifelse(tolower(co_state_smoked) %in% c("yes", "y", "true"), TRUE,
-                             ifelse(tolower(co_state_smoked) %in% c("no", "n", "false"), FALSE, NA)),
-    co_correct_procedure = ifelse(tolower(co_correct_procedure) %in% c("yes", "y", "true"), TRUE,
-                                  ifelse(tolower(co_correct_procedure) %in% c("no", "n", "false"), FALSE, NA)),
     co_vid_time = as.POSIXct(
-      paste(co_date, format(co_time_recorded, "%I:%M %p")),
-      format = "%Y-%m-%d %I:%M %p",
+      paste(co_date, format(co_time_parsed, "%H:%M:%S")),
+      format = "%Y-%m-%d %H:%M:%S",
       tz = "America/New_York"
+    ),
+    co_state_smoked = case_when(
+      tolower(co_state_smoked) %in% c("yes", "y", "true") ~ TRUE,
+      tolower(co_state_smoked) %in% c("no", "n", "false") ~ FALSE,
+      TRUE ~ NA
+    ),
+    co_correct_procedure = case_when(
+      tolower(co_correct_procedure) %in% c("yes", "y", "true") ~ TRUE,
+      tolower(co_correct_procedure) %in% c("no", "n", "false") ~ FALSE,
+      TRUE ~ NA
     )
   ) %>%
   select(participant_id, co_day, co_date, co_time_recorded,
@@ -512,13 +530,46 @@ co_data <- expand.grid(
 study_sample <- study_sample %>%
   left_join(co_data, by = c("participant_id", "dayno" = "co_day"))
 
-# Clean up intermediate object
-rm(part6_long)
+# Clean up intermediate objects
+rm(part6_raw, part6_long, co_data)
 ```
 
-`r button(text = "Description")`
 `r endbutton()` 
 
+We now have a single dataset containing EMA, baseline, and CO video data, called study_sample.
+`r txt('esm-inspect','Inspection',"study_sample dataset meta-info:",FALSE)` 
+```{r}
+cat("## Path      : in-memory dataframe\n")
+cat("## Extension : RDS (original format, now in-memory)\n")
+cat("## Size      :", format(object.size(study_sample), units = "auto"), "\n\n")
+
+# Dimensions
+cat("## ncol      :", ncol(study_sample), "\n")
+cat("## nrow      :", nrow(study_sample), "\n\n")
+
+# Number of participants
+id_var <- "participant_id"
+n_participants <- n_distinct(study_sample[[id_var]])
+cat("## Number of participants :", n_participants, "\n")
+
+# Average number of observations per participant
+avg_obs <- nrow(study_sample) / n_participants
+cat("## Average number of observations per participant :", round(avg_obs, 1), "\n\n")
+
+# Time period
+time_var <- "init_time"
+if(time_var %in% names(study_sample)) {
+  time_min <- min(study_sample[[time_var]], na.rm = TRUE)
+  time_max <- max(study_sample[[time_var]], na.rm = TRUE)
+  cat("## Period : from", format(time_min, "%Y-%m-%d %H:%M:%S"),
+      "to", format(time_max, "%Y-%m-%d %H:%M:%S"), "\n\n")
+} else {
+  cat("## Period : init_time variable not found in dataset\n\n")
+}
+
+# Variable names
+cat("## Variables :", paste(names(study_sample), collapse = ", "), "\n")
+```
 # Flag (in)valid observations
 
 We use logical tests to define which observations are valid so that we can compare the total N of valid observations between the two datasets. The 'valid' observations are the ones where there are no missing values in the variables of interest (i.e., 'mood', 'before_survey', 'smoke'), and two others that branch off of the variable 'before_survey' ('pleasant', 'unpleasant') . Below we create a validity function that can be used to filter data later.
@@ -755,11 +806,12 @@ Skipped Revol & colleagues' (2024) step to check coherence of missing values in 
 
 # Create time variables
 
-Our analyses require the creation of time-related variables. We already created the 'obsno' variable above, which represents the serial order in which a given observation occurs. 
+Our analyses require the creation of time-related variables: 'obsno', which represents the serial order in which a given observation occurs (created above), 'dayno', which represents the day since the participant's first beep (created above), and 'beepno', which represents the beep number (1-6) within a day for a participant (created in next code chunk), and 'duration', which is a time-invariant measure of the total length of one's participation (created in next code chunk). 
 
-`r txt('esm-mod','Modification',"In addition to creating the 'obsno' variable earlier we also create 'dayno' (day since first beep was sent), 'duration' (total length of one's participation), and 'beepno' which is the observation number within a given day.")`
+`r txt('esm-mod','Modification',"We created the 'obsno' and 'dayno' variables earlier. Here, we create 'dayno' and 'duration'.")` 
 
 `r button(text = "Description")` 
+
 ```{r}
 study_sample <- study_sample %>%
   
@@ -774,16 +826,6 @@ study_sample <- study_sample %>%
     day    = day(completion_time),
     hour   = hour(completion_time),
     minute = minute(completion_time),
-    
-    
-    # Day number since first beep (day-level)
-    dayno = as.numeric(
-      difftime(
-        as.Date(completion_time),
-        as.Date(min(completion_time, na.rm = TRUE)),
-        units = "days"
-      )
-    ) + 1,
     
     # Study duration in days (time-invariant)
     duration = as.numeric(
