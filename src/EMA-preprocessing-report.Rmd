@@ -63,7 +63,7 @@ In certain cases, you might need to use the '!important' declaration to override
 
 # Overview and data collection procedure
 
-This R Markdown file is based on Revol et al. (2024)'s step-by-step guidelines for preprocessing ESM data: [https://preprocess.esmtools.com](https://preprocess.esmtools.com). It includes code adapted from Steps 1 - 4, tailored to preprocess EMA data for a secondary analysis of EMA data from the DVAL project (https://osf.io/nb9ct/overview?view_only=4f777b3907bb47aab6387aaa4353285c). In Part 2 of the study, participants received semi-random prompts 6 times throughout the day within predeterimined 2-hr intervals for three consecutive days, and were instructed to smoke at their normal rate. In Part 6 of the study, the same sampling scheme continued for 7 more days, during which participants were informed they could receive daily cash bonuses for day-level cigarette abstinence and were asked to biochemically verify abstinence daily. Both EMA datasets will be combined for this study's analyses, and time-invariant variables (e.g., age, cigarette dependence) will be pulled from a baseline dataset. The steps to prepare the data for analysis are described below.   
+This R Markdown file is based on Revol et al. (2024)'s step-by-step guidelines for preprocessing ESM data: [https://preprocess.esmtools.com](https://preprocess.esmtools.com). It includes code adapted from Steps 1 - 4, tailored to preprocess EMA data for a secondary analysis of EMA data from the DVAL project (https://osf.io/nb9ct/overview?view_only=4f777b3907bb47aab6387aaa4353285c). In Part 2 of the study, participants received semi-random prompts 6 times throughout the day within predeterimined 2-hr intervals for 3 consecutive days, and were instructed to smoke at their normal rate. In Part 6 of the study, the same sampling scheme continued for 7 more days, during which participants were informed they could receive daily cash bonuses for day-level cigarette abstinence and were asked to biochemically verify abstinence daily. Both EMA datasets will be combined for this study's analyses, and time-invariant variables (e.g., age, cigarette dependence) will be pulled from a baseline dataset. The steps to prepare the data for analysis are described below.   
 
 ---
 # Load packages
@@ -101,7 +101,7 @@ library(hms)
 
 # Step 1: Import data and preliminary preprocessing
 
-This section is dedicated to the first look at the data, the merging of data sources the first basic preprocessing methods (e.g., duplicates, branching items check), and checking the variable consistency when the data have just been imported.
+This section is dedicated to the first look at the data, the merging of data sources, the first basic preprocessing methods (e.g., duplicates, branching items check), and checking the variable consistency when the data have just been imported.
 
 Import the data: 
 ```{r}
@@ -321,8 +321,7 @@ baseline <- merge(A, B, by = "participant-id", all = TRUE, suffixes = c(".A", ".
 baseline <- clean_names(baseline)
 
 # Filter to participants who completed Part 2 EMA
-analytic_sample <- c(102, 104, 107, 112, 113, 115, 116, 124, 125, 126, 127, 128, 133, 141, 150, 151, 154, 159, 163, 164, 166, 169, 175, 177, 180, 186, 188,
-192, 195, 196, 197, 198, 199, 202, 206, 209, 210, 213, 214, 216, 218, 221, 222, 223, 233, 238, 240, 246, 252, 257, 262, 268, 273, 274, 278, 281, 282, 286, 287, 290, 291, 295, 297, 300, 301, 304, 310, 314, 320, 321, 329, 332, 340, 341, 342, 344, 346, 349, 351, 356, 362, 369, 370, 372, 381, 383, 393, 394, 399, 416, 423, 427, 428, 430)
+analytic_sample <- c(102, 104, 107, 112, 113, 115, 116, 124, 125, 126, 127, 128, 133, 141, 150, 151, 154, 159, 163, 164, 166, 169, 175, 177, 180, 186, 188, 192, 195, 196, 197, 198, 199, 202, 206, 209, 210, 213, 214, 216, 218, 221, 222, 223, 233, 238, 240, 246, 252, 257, 262, 268, 273, 274, 278, 281, 282, 286, 287, 290, 291, 295, 297, 300, 301, 304, 310, 314, 320, 321, 329, 332, 340, 341, 342, 344, 346, 349, 351, 356, 362, 363, 369, 370, 372, 381, 383, 393, 394, 399, 416, 423, 427, 428, 430)
 baseline <- baseline %>% filter(participant_id %in% analytic_sample)
 
 # FTND: Fagerstrom Test for Cigarette Dependence
@@ -449,97 +448,145 @@ study_sample <- study_sample %>%
 
 Baseline and EMA data are now merged.
 
-`r txt(id='esm-issue',title='Issue',text="Daily biochemical abstinence verification (i.e., breath Carbon Monoxide (CO) concentration) data must be included for validity checks. ",FALSE)`
+`r txt(id='esm-issue',title='Issue',text="Daily biochemical abstinence verification (i.e., breath Carbon Monoxide (CO) concentration) data must be included for validity checks.",FALSE)`
 
 `r txt('esm-mod','Modification',"Biochemical abstinence verification data are read in, cleaned, and merged with the EMA+baseline dataset.")`
 
 `r button(text = "Description")`
 
 ```{r}
-# Import Part 6 CO data sheet
+# IDs for analytic sample (Part 2 subset)
+analytic_sample <- c(102, 104, 107, 112, 113, 115, 116, 124, 125, 126, 127, 128, 133, 141,
+                     150, 151, 154, 159, 163, 164, 166, 169, 175, 177, 180, 186, 188, 192,
+                     195, 196, 197, 198, 199, 202, 206, 209, 210, 213, 214, 216, 218, 221,
+                     222, 223, 233, 238, 240, 246, 252, 257, 262, 268, 273, 274, 278, 281,
+                     282, 286, 287, 290, 291, 295, 297, 300, 301, 304, 310, 314, 320, 321,
+                     329, 332, 340, 341, 342, 344, 346, 349, 351, 356, 362, 363, 369, 370,
+                     372, 381, 383, 393, 394, 399, 416, 423, 427, 428, 430)
+
 co_path <- here("data/DVAL_CO-video_data_full.xlsx")
-sheet_name <- "Video info - Part 6 (7-day)"
 
-part6_raw <- read_excel(co_path, sheet = sheet_name,
-                        na = c("N/A", "n/a")) %>%
-  clean_names() %>%
-  select(-notes, -verified)
+# ---------------------------
+# Function to clean and pivot CO sheets (robust co_vid_time)
+# ---------------------------
+clean_co_sheet <- function(sheet_name, day_offset = 0, subset_ids = NULL) {
+  
+  raw <- read_excel(co_path, sheet = sheet_name,
+                    na = c("N/A", "n/a")) %>%
+    clean_names() %>%
+    select(-notes, -verified)
+  
+  if(!is.null(subset_ids)) {
+    raw <- raw %>% filter(participant_id %in% subset_ids)
+  }
+  
+  # Identify columns
+  co_level_cols <- grep("_co_level$", names(raw), value = TRUE)
+  time_cols <- grep("_time_recorded$", names(raw), value = TRUE)
+  
+  raw <- raw %>%
+    mutate(across(all_of(c(co_level_cols, time_cols)), as.character)) %>%
+    mutate(across(all_of(time_cols), ~ trimws(.)))
+  
+  long <- raw %>%
+    pivot_longer(
+      cols = -participant_id,
+      names_to = c("co_day", ".value"),
+      names_pattern = "day_(\\d+)_(.+)"
+    ) %>%
+    mutate(co_day = as.integer(co_day) + day_offset) %>%
+    rename(
+      co_date = date,
+      co_time_recorded = time_recorded,
+      co_level = co_level,
+      co_state_smoked = state_smoked,
+      co_correct_procedure = correct_procedure
+    ) %>%
+    mutate(
+      co_level = suppressWarnings(as.numeric(co_level)),
+      co_date = as.Date(co_date),
+      
+      # ---- Robust parsing for co_time_recorded ----
+      # Remove Excel dummy date if present
+      co_time_only = sub("1899-12-31\\s+", "", co_time_recorded),
+      # Combine co_date + time to POSIXct
+      co_vid_time = as.POSIXct(
+        paste(co_date, co_time_only),
+        format = "%Y-%m-%d %H:%M:%S",
+        tz = "America/New_York"
+      ),
+      
+      co_state_smoked = case_when(
+        tolower(co_state_smoked) %in% c("yes","y","true") ~ TRUE,
+        tolower(co_state_smoked) %in% c("no","n","false") ~ FALSE,
+        TRUE ~ NA
+      ),
+      co_correct_procedure = case_when(
+        tolower(co_correct_procedure) %in% c("yes","y","true") ~ TRUE,
+        tolower(co_correct_procedure) %in% c("no","n","false") ~ FALSE,
+        TRUE ~ NA
+      )
+    ) %>%
+    select(participant_id, co_day, co_date, co_time_recorded,
+           co_level, co_state_smoked, co_correct_procedure, co_vid_time)
+  
+  return(long)
+}
 
-# Temporarily coerce mixed-type columns to character and trim whitespace
-co_level_cols <- grep("_co_level$", names(part6_raw), value = TRUE)
-time_cols <- grep("_time_recorded$", names(part6_raw), value = TRUE)
+# ---------------------------
+# Process Part 2 (days 1–3) for analytic sample
+# ---------------------------
+part2_long <- clean_co_sheet(
+  sheet_name = "Video info - Part 2 (3-day)",
+  day_offset = 0,
+  subset_ids = analytic_sample
+)
 
-part6_raw <- part6_raw %>%
-  mutate(across(all_of(c(co_level_cols, time_cols)), as.character)) %>%
-  mutate(across(all_of(time_cols), ~ trimws(.)))
+# ---------------------------
+# Process Part 6 (days 4–10)
+# ---------------------------
+part6_long <- clean_co_sheet(
+  sheet_name = "Video info - Part 6 (7-day)",
+  day_offset = 3
+)
 
-# Pivot wide -> long
-part6_long <- part6_raw %>%
-  pivot_longer(
-    cols = -participant_id,
-    names_to = c("co_day", ".value"),
-    names_pattern = "day_(\\d+)_(.+)"
-  ) %>%
-  mutate(co_day = as.integer(co_day) + 3) %>%
-  rename(
-    co_date = date,
-    co_time_recorded = time_recorded,
-    co_level = co_level,
-    co_state_smoked = state_smoked,
-    co_correct_procedure = correct_procedure
-  )
+# ---------------------------
+# Combine Part 2 + Part 6
+# ---------------------------
+co_long <- bind_rows(part2_long, part6_long)
 
-# Convert types and combine date + time (suppress warnings introduced when raw missing cases represented by the literal text "N/A" get converted to actual missing cases)
-part6_long <- part6_long %>%
-  mutate(
-    co_level = suppressWarnings(as.numeric(co_level)),
-    co_time_parsed = suppressWarnings(
-      parse_date_time(co_time_recorded, orders = "I:M p", tz = "UTC")
-    ),
-    co_date = as.Date(co_date),
-    co_vid_time = as.POSIXct(
-      paste(co_date, format(co_time_parsed, "%H:%M:%S")),
-      format = "%Y-%m-%d %H:%M:%S",
-      tz = "America/New_York"
-    ),
-    co_state_smoked = case_when(
-      tolower(co_state_smoked) %in% c("yes", "y", "true") ~ TRUE,
-      tolower(co_state_smoked) %in% c("no", "n", "false") ~ FALSE,
-      TRUE ~ NA
-    ),
-    co_correct_procedure = case_when(
-      tolower(co_correct_procedure) %in% c("yes", "y", "true") ~ TRUE,
-      tolower(co_correct_procedure) %in% c("no", "n", "false") ~ FALSE,
-      TRUE ~ NA
-    )
-  ) %>%
-  select(participant_id, co_day, co_date, co_time_recorded,
-         co_level, co_state_smoked, co_correct_procedure, co_vid_time)
-
-# Expand full co_day 4–10 for all participants
+# ---------------------------
+# Expand full co_day 1–10 for all participants
+# ---------------------------
 participants <- unique(study_sample$participant_id)
 
 co_data <- expand.grid(
   participant_id = participants,
-  co_day = 4:10
+  co_day = 1:10
 ) %>%
-  left_join(part6_long, by = c("participant_id", "co_day")) %>%
+  left_join(co_long, by = c("participant_id", "co_day")) %>%
   arrange(participant_id, co_day)
 
+# ---------------------------
 # Merge CO data with EMA dataset
+# ---------------------------
 study_sample <- study_sample %>%
   left_join(co_data, by = c("participant_id", "dayno" = "co_day"))
 
-# Clean up intermediate objects
-rm(part6_raw, part6_long, co_data)
+# Optional: remove intermediate objects
+rm(part2_long, part6_long, co_long, co_data)
 ```
 
 `r endbutton()` 
 
 We now have a single dataset containing EMA, baseline, and CO video data, called study_sample.
 `r txt('esm-inspect','Inspection',"study_sample dataset meta-info:",FALSE)` 
+
+
 ```{r}
+
 cat("## Path      : in-memory dataframe\n")
+
 cat("## Extension : RDS (original format, now in-memory)\n")
 cat("## Size      :", format(object.size(study_sample), units = "auto"), "\n\n")
 
@@ -570,9 +617,11 @@ if(time_var %in% names(study_sample)) {
 # Variable names
 cat("## Variables :", paste(names(study_sample), collapse = ", "), "\n")
 ```
+
 # Flag (in)valid observations
 
 We use logical tests to define which observations are valid so that we can compare the total N of valid observations between the two datasets. The 'valid' observations are the ones where there are no missing values in the variables of interest (i.e., 'mood', 'before_survey', 'smoke'), and two others that branch off of the variable 'before_survey' ('pleasant', 'unpleasant') . Below we create a validity function that can be used to filter data later.
+
 ```{r}
 # Create validity function 
 check_validity <- function(df) {
@@ -588,6 +637,7 @@ check_validity <- function(df) {
   
   as.integer(is_valid)
 }
+
 ```
 
 
@@ -617,13 +667,12 @@ Revol and colleagues' (2024) step for renaming and relabeling step skipped here 
 
 ## Duplication
 
-
-
 `r txt(id='esm-issue',title='Issue',text=" Participant #102 had two observations within a single observation 2-hr observation window due to a time-out issue. This issue arose when one of their surveys was interrupted and resent to the participant, but both the interrupted and the actual observation were saved. This interrupted observation contained no usable data.",FALSE)`
 
 `r txt('esm-mod','Modification',"The following code removes the interrupted observation from participant 102 and revisits obsno summary to ensure Participant #102's max obsno == 60.")`
 
 `r button(text = "Description")` 
+
 ```{r}
 # Examine number of observations sent to participants
 obsno_summary <- study_sample %>%
