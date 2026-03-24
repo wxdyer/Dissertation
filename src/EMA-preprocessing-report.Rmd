@@ -701,9 +701,6 @@ obsno_summary
 ```{r}
 sum(duplicated(study_sample))
 ```
-```{r}
-sum(duplicated(study_sample))
-```
 
 **Look for duplicated answers** (duplication in the self-reported items): no issue found regarding the number of self-reported items, the values of the variables involved, and the number of times duplicated.
 
@@ -832,8 +829,6 @@ The following plot gives an overview of the missing values in the dataframe.
 ## Overview of missing values
 
 ```{r, fig.width=8, fig.height=10}
-library(ggplot2)
-
 data <- study_sample %>% 
   arrange(participant_id, completion_time)
 
@@ -1321,5 +1316,7 @@ cat("## Variables :", paste(names(study_sample), collapse = ", "), "\n")
 saveRDS(study_sample, file = here("output", "cleaned_study_sample.RDS"))
 ```
 
-#Revol, J., Carlier, C., Lafit, G., Verhees, M., Sels, L., & Ceulemans, E. (2024). Preprocessing ESM data: a step-by-step framework, tutorial website, R package, and reporting templates.
+# References
+
+Revol, J., Carlier, C., Lafit, G., Verhees, M., Sels, L., & Ceulemans, E. (2024). Preprocessing ESM data: a step-by-step framework, tutorial website, R package, and reporting templates.
 
