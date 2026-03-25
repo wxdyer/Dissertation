@@ -427,19 +427,13 @@ study_sample <- ema_master %>%
     # Then baseline variables at the end
     all_of(baseline_vars)
   )
-# Create 'obsno' variable, representing the serial order of observations within-participant, and 'dayno' variable, representing the days since first completed beep. This is to prepare for biochemical abstinence verification data merging.
+# Create 'obsno' variable, representing the serial order of observations within-participant, and 'dayno' variable, based on the date of the first completed beep (dayno == 1). This is to prepare for biochemical abstinence verification data merging.
 study_sample <- study_sample %>%
   arrange(participant_id, completion_time) %>%
   group_by(participant_id) %>%
   mutate(
     obsno = row_number(),
-    dayno = as.numeric(
-      difftime(
-        as.Date(completion_time),
-        as.Date(min(completion_time, na.rm = TRUE)),
-        units = "days"
-      )
-    ) + 1
+    dayno = dense_rank(as.Date(completion_time))
   ) %>%
   ungroup()
 ```
@@ -570,11 +564,13 @@ co_data <- expand.grid(
 # ---------------------------
 # Merge CO data with EMA dataset
 # ---------------------------
+
 study_sample <- study_sample %>%
   left_join(co_data, by = c("participant_id", "dayno" = "co_day"))
 
 # Optional: remove intermediate objects
 rm(part2_long, part6_long, co_long, co_data)
+
 ```
 
 `r endbutton()` 
