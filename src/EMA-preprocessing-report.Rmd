@@ -842,6 +842,7 @@ We can get a sense for patterns of missingness by identifying the potential rela
 gg_miss_upset(study_sample)
 ```
 
+
 Skipped Revol & colleagues' (2024) step to check coherence of missing values in the variables of interest because what would go here -- the missingness pattern between 'before_survey', 'pleasant', and 'unpleasant' was already examined above. 
 
 # Create time variables
@@ -851,23 +852,17 @@ Our analyses require the creation of time-related variables: 'obsno', which repr
 `r txt('esm-mod','Modification',"We created the 'obsno' and 'dayno' variables earlier. Here, we create 'dayno' and 'duration'.")` 
 
 `r button(text = "Description")` 
-
 ```{r}
+# Step 1: time components and duration
 study_sample <- study_sample %>%
-  
   arrange(participant_id, completion_time) %>%
-  
   group_by(participant_id) %>%
-  
   mutate(
-    # Time components
-    year   = year(completion_time),
-    month  = month(completion_time),
-    day    = day(completion_time),
-    hour   = hour(completion_time),
-    minute = minute(completion_time),
-    
-    # Study duration in days (time-invariant)
+    year     = year(completion_time),
+    month    = month(completion_time),
+    day      = day(completion_time),
+    hour     = hour(completion_time),
+    minute   = minute(completion_time),
     duration = as.numeric(
       difftime(
         as.Date(max(completion_time, na.rm = TRUE)),
@@ -876,14 +871,14 @@ study_sample <- study_sample %>%
       )
     ) + 1
   ) %>%
-  
-  ungroup() %>%
-  
-  # Beep number within day
-  group_by(participant_id, dayno) %>%
-  mutate(beepno = row_number()) %>%
   ungroup()
 
+# Step 2: beepno — must run after dayno is correctly defined
+study_sample <- study_sample %>%
+  arrange(participant_id, dayno, completion_time) %>%
+  group_by(participant_id, dayno) %>%
+  mutate(beepno = ifelse(is.na(dayno), NA_integer_, row_number())) %>%
+  ungroup()
 ```
 
 `r endbutton()` 

@@ -10,7 +10,7 @@
 
 
 
-<meta name="date" content="2026-03-25" />
+<meta name="date" content="2026-03-26" />
 
 <title>EMA Preprocessing Report</title>
 
@@ -1480,7 +1480,7 @@ border-radius: 0px;
 
 <h1 class="title toc-ignore">EMA Preprocessing Report</h1>
 <h4 class="author">Walter G. Dyer, <a href="mailto:wdyer@psu.edu" class="email">wdyer@psu.edu</a>, Penn State University</h4>
-<h4 class="date">2026-03-25</h4>
+<h4 class="date">2026-03-26</h4>
 
 </div>
 
@@ -4701,21 +4701,16 @@ function esmtools_toggleContent(button) {
     }
 }
 </script>
-<pre class="r"><code>study_sample &lt;- study_sample %&gt;%
-  
+<pre class="r"><code># Step 1: time components and duration
+study_sample &lt;- study_sample %&gt;%
   arrange(participant_id, completion_time) %&gt;%
-  
   group_by(participant_id) %&gt;%
-  
   mutate(
-    # Time components
-    year   = year(completion_time),
-    month  = month(completion_time),
-    day    = day(completion_time),
-    hour   = hour(completion_time),
-    minute = minute(completion_time),
-    
-    # Study duration in days (time-invariant)
+    year     = year(completion_time),
+    month    = month(completion_time),
+    day      = day(completion_time),
+    hour     = hour(completion_time),
+    minute   = minute(completion_time),
     duration = as.numeric(
       difftime(
         as.Date(max(completion_time, na.rm = TRUE)),
@@ -4724,12 +4719,13 @@ function esmtools_toggleContent(button) {
       )
     ) + 1
   ) %&gt;%
-  
-  ungroup() %&gt;%
-  
-  # Beep number within day
+  ungroup()
+
+# Step 2: beepno — must run after dayno is correctly defined
+study_sample &lt;- study_sample %&gt;%
+  arrange(participant_id, dayno, completion_time) %&gt;%
   group_by(participant_id, dayno) %&gt;%
-  mutate(beepno = row_number()) %&gt;%
+  mutate(beepno = ifelse(is.na(dayno), NA_integer_, row_number())) %&gt;%
   ungroup()</code></pre>
 <p>
 </div>
