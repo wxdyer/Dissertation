@@ -1,0 +1,1153 @@
+---
+title: "EMA Data Characteristics Report"
+author:
+  - name: Walter G. Dyer, wdyer@psu.edu, Penn State University
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+      toc: true
+      number_sections: false
+      toc_float: true
+      toc_depth: 3
+---
+
+<!-- Javascript code to zoom in and out in the plots. -->
+<!-- Code from Radovan Miletić: https://stackoverflow.com/questions/56361986/zoom-function-in-rmarkdown-html-plot -->
+<script src = "https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+<script type="text/javascript">
+$(document).ready(function() {
+    $('body').prepend('<div class=\"zoomDiv\"><img src=\"\" class=\"zoomImg\"></div>');
+    $('img:not(.zoomImg)').click(function() {
+    $('.zoomImg').attr('src', $(this).attr('src')).css({width: '100%'});
+    $('.zoomDiv').css({opacity: '1', width: 'auto', border: '1px solid white', borderRadius: '5px', position: 'fixed', top: '50%', left: '50%', marginRight: '-50%', transform: 'translate(-50%, -50%)', boxShadow: '0px 0px 50px #888888', zIndex: '50', overflow: 'auto', maxHeight: '100%'});
+    });
+    $('img.zoomImg').click(function() {
+    $('.zoomDiv').css({opacity: '0', width: '0%'}); 
+    });
+});
+</script>
+
+<style>
+/* esmtools default label styles */
+.esm-issue{
+}
+
+/* Committee-specific callout */
+.committee-note {
+  background-color: #f0f4ff;
+  border-left: 4px solid #4a6fa5;
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin: 8px 0;
+  font-size: 0.9em;
+  color: #2c3e6b;
+}
+
+.committee-note .committee-label {
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.8em;
+  color: #4a6fa5;
+  display: block;
+  margin-bottom: 2px;
+}
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+```
+
+```{r packages, message=FALSE, warning=FALSE}
+# Data management
+library(dplyr)
+library(tidyr)
+library(here)
+library(htmltools)
+
+# EMA preprocessing tools
+library(esmtools)
+
+# Descriptive statistics
+library(skimr)
+
+# Multilevel modeling (for ICC estimation)
+library(lme4)
+
+# Missing values
+library(naniar)
+library(visdat)
+
+# Plotting
+library(ggplot2)
+
+# Dates and times
+library(lubridate)
+library(hms)
+
+# Tables
+library(knitr)
+library(kableExtra)
+```
+
+```{r functions}
+# Committee callout function
+committee_note <- function(text) {
+  htmltools::HTML(paste0(
+    '<div class="committee-note">',
+    '<span class="committee-label">Committee</span>',
+    text,
+    '</div>'
+  ))
+}
+
+# Validity function (carried over from preprocessing report)
+check_validity <- function(df) {
+  mood_ok          <- !is.na(df$mood)
+  before_survey_ok <- !is.na(df$before_survey)
+  smoke_ok         <- !is.na(df$smoke)
+  branch_ok        <- !is.na(df$pleasant) | !is.na(df$unpleasant)
+  as.integer(mood_ok & before_survey_ok & smoke_ok & branch_ok)
+}
+```
+
+```{r load-data}
+# Load preprocessed dataset from Report 1 output
+study_sample <- readRDS(here("output", "cleaned_study_sample.RDS"))
+```
+
+---
+
+# Overview
+
+This report characterizes the preprocessed EMA dataset for Walter Dyer's dissertation from the DVAL project parent study following Revol et al.'s (2024) data characteristics report guidelines. It describes the quality of the data collection, the properties of the key EMA variables, and selected preliminary analyses. Content flagged with a **Committee** label addresses questions raised during the proposal defense.
+
+The preprocessed dataset was produced by the companion EMA Preprocessing Report and is loaded directly from that report's output. All analyses here are conducted on the fully preprocessed dataset.
+
+**Study summary:** Participants completed EMA surveys 6 times per day within predetermined 2-hour intervals. Part 2 (Days 1--3) was a baseline period during which participants were instructed to smoke at their normal rate. Part 6 (Days 4--10) was an incentivized abstinence period during which participants could earn daily cash bonuses for verified cigarette abstinence. EMA, baseline, and biochemical verification (CO) data are included in the preprocessed dataset.
+
+---
+
+# Variable Descriptions
+
+This section provides an overview of all variables in the preprocessed dataset, including their type, role, and expected range.
+
+`r button(text = "Description")`
+
+```{r variable-descriptions}
+# Overview of variable names and types
+glimpse(study_sample)
+```
+
+```{r variable-table}
+# Summary table of key variables
+var_info <- tibble::tribble(
+  ~Variable,                  ~Type,          ~Role,                        ~Range_or_Values,
+  "participant_id",           "Numeric",       "Identifier",                 "Unique per participant",
+  "session_id",               "Numeric",       "Identifier",                 "Unique per beep",
+  "study_part",               "Numeric",       "Study design",               "2 = baseline, 6 = incentive",
+  "init_time",                "POSIXct",       "Timestamp",                  "Datetime",
+  "completion_time",          "POSIXct",       "Timestamp",                  "Datetime",
+  "obsno",                    "Numeric",       "Time variable",              "1-60",
+  "dayno",                    "Numeric",       "Time variable",              "1-10",
+  "beepno",                   "Numeric",       "Time variable",              "1-6",
+  "duration",                 "Numeric",       "Time-invariant",             "Days of participation",
+  "mood",                     "Numeric",       "EMA outcome",                "1-100",
+  "smoke",                    "Numeric",       "EMA outcome",                "1-100",
+  "before_survey",            "Categorical",   "EMA branching item",         "Pleasant/Unpleasant/Neutral",
+  "pleasant",                 "Numeric",       "EMA outcome (branch)",       "1-100",
+  "unpleasant",               "Numeric",       "EMA outcome (branch)",       "1-100",
+  "prior_mood",               "Numeric",       "EMA outcome",                "1-100",
+  "smoked_since_last_survey", "Numeric",       "EMA smoking behavior",       "0-6",
+  "age",                      "Numeric",       "Baseline covariate",         "Years",
+  "gender",                   "Categorical",   "Baseline covariate",         "Categorical",
+  "race",                     "Categorical",   "Baseline covariate",         "Categorical",
+  "total_household_income",   "Numeric",       "Baseline covariate",         "Dollars per year",
+  "bank_balance",             "Numeric",       "Baseline covariate",         "Dollars",
+  "ftnd_sum",                 "Numeric",       "Baseline covariate",         "0-10",
+  "cigsperday",               "Numeric",       "Baseline covariate",         "Cigarettes smoked per day",
+  "shaps_sim_sum",            "Numeric",       "Baseline covariate",         "0-14",
+  "panas_pos",                "Numeric",       "Baseline covariate",         "10-50",
+  "panas_neg",                "Numeric",       "Baseline covariate",         "10-50",
+  "co_level",                 "Numeric",       "Biochemical verification",   "parts per million",
+  "co_date",                  "Date",          "Biochemical verification",   "Date",
+  "co_state_smoked",          "Logical",       "Biochemical verification",   "TRUE/FALSE",
+  "co_correct_procedure",     "Logical",       "Biochemical verification",   "TRUE/FALSE"
+)
+
+kable(var_info, caption = "Variable descriptions for the preprocessed DVAL EMA dataset") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+```
+
+`r endbutton()`
+
+---
+
+# Sample Description
+
+`r committee_note("This section addresses committee questions about the demographic characteristics of the sample and the flow of participants through the study.")`
+
+## Demographics
+
+`r committee_note("The committee requested a description of the demographic characteristics of the sample.")`
+
+`r button(text = "Description")`
+
+```{r demographics}
+# Pull one row per participant (time-invariant variables)
+baseline_chars <- study_sample %>%
+  group_by(participant_id) %>%
+  slice(1) %>%
+  ungroup()
+
+# N total
+cat("Total participants:", nrow(baseline_chars), "\n")
+
+# Age
+cat("\nAge:\n")
+baseline_chars %>%
+  summarise(
+    n = sum(!is.na(age)),
+    mean = round(mean(age, na.rm = TRUE), 2),
+    sd   = round(sd(age, na.rm = TRUE), 2),
+    min  = min(age, na.rm = TRUE),
+    max  = max(age, na.rm = TRUE)
+  ) %>% print()
+
+# Gender
+cat("\nGender:\n")
+baseline_chars %>%
+  count(gender) %>%
+  mutate(pct = round(n / sum(n) * 100, 1)) %>%
+  print()
+
+# Race
+cat("\nRace:\n")
+race_labels <- c(
+  "1" = "American Indian or Alaska Native",
+  "2" = "Asian",
+  "3" = "Black or African-American",
+  "4" = "Native Hawaiian or Other Pacific Islander",
+  "5" = "White",
+  "6" = "More than one race",
+  "7" = "Unknown or prefer not to answer"
+)
+baseline_chars %>%
+  mutate(race = recode(as.character(race), !!!race_labels)) %>%
+  count(race) %>%
+  mutate(pct = round(n / sum(n) * 100, 1)) %>%
+  print()
+
+# Income
+cat("\nHousehold income:\n")
+baseline_chars %>%
+  count(total_household_income) %>%
+  mutate(pct = round(n / sum(n) * 100, 1)) %>%
+  print()
+```
+
+`r endbutton()`
+
+## CONSORT Diagram
+
+`r committee_note("The committee requested a CONSORT diagram to document participant flow through the study.")`
+
+```{r consort}
+# Participant counts for CONSORT diagram
+n_part2 <- study_sample %>%
+  filter(study_part == 2) %>%
+  distinct(participant_id) %>%
+  nrow()
+
+n_part6 <- study_sample %>%
+  filter(study_part == 6) %>%
+  distinct(participant_id) %>%
+  nrow()
+
+n_total <- study_sample %>%
+  distinct(participant_id) %>%
+  nrow()
+
+n_part2_only <- n_total - n_part6
+
+cat("Participants with Part 2 data:", n_part2, "\n")
+cat("Participants with Part 6 data:", n_part6, "\n")
+cat("Participants with Part 2 data only:", n_part2_only, "\n")
+cat("Dropout between Part 2 and Part 6:", n_part2 - n_part6, "\n")
+```
+
+```{r consort, fig.width=8, fig.height=12}
+library(DiagrammeR)
+
+# Dynamically computed from study_sample
+n_part2 <- study_sample %>%
+  filter(study_part == 2) %>%
+  distinct(participant_id) %>%
+  nrow()
+
+n_part6 <- study_sample %>%
+  filter(study_part == 6) %>%
+  distinct(participant_id) %>%
+  nrow()
+
+n_dropout <- n_part2 - n_part6
+
+grViz(paste0('
+digraph consort {
+
+  graph [layout = dot, rankdir = TB, fontname = "Helvetica"]
+  node  [shape = rectangle, fontname = "Helvetica", fontsize = 11,
+         style = filled, fillcolor = white, margin = "0.2,0.1"]
+  edge  [fontname = "Helvetica", fontsize = 10]
+
+  # Main flow nodes
+  screened   [label = "Screened via telephone\n(n = 1,187)"]
+  consented  [label = "Consented\n(n = 139)"]
+  baseline   [label = "Completed baseline laboratory visit\n(n = 118)"]
+  part2      [label = "Completed 3-day baseline EMA and\nmet criteria for continuation\n(n = ', n_part2, ')"]
+  mock       [label = "Completed mock scanner training visit\n(n = 82)"]
+  randomized [label = "Randomized to scan order A (n = 41)\nor scan order B (n = 41)"]
+  part6      [label = "Completed 7-day EMA period\nwith incentivized abstinence\n(n = ', n_part6, ')"]
+
+  # Exclusion nodes
+  excl1 [label = "Declined to participate (n = 189)\nNot eligible (n = 858)\nUnable to schedule: COVID-19 shutdown (n = 1)",
+          shape = rectangle, fillcolor = "#f9f9f9"]
+  excl2 [label = "Declined to continue (n = 2)\nScreened out: CPD below cutoff (n = 3)\nScreened out: baseline CO below cutoff (n = 5)\nScreened out: MRI-related exclusion (n = 6)\nScreened out: substance dependence on MINI (n = 5)",
+          shape = rectangle, fillcolor = "#f9f9f9"]
+  excl3 [label = "Declined to continue (n = 11)\nUnable to continue: COVID-19 shutdown (n = 3)\nWithdrawn: protocol compliance below threshold (n = 9)",
+          shape = rectangle, fillcolor = "#f9f9f9"]
+  excl4 [label = "Withdrawn: claustrophobia/discomfort (n = 6)\nWithdrawn: experimental CO above cutoff (n = 4)\nWithdrawn: MRI-related exclusion (n = 2)\nWithdrawn: repeated cancellations (n = 1)",
+          shape = rectangle, fillcolor = "#f9f9f9"]
+  excl5 [label = "Declined to continue (n = 10)\nDied (n = 1)",
+          shape = rectangle, fillcolor = "#f9f9f9"]
+  excl6 [label = "Dropout between Part 2 and Part 6\n(n = ', n_dropout, ')",
+          shape = rectangle, fillcolor = "#f9f9f9"]
+
+  # Main flow edges
+  screened   -> consented
+  consented  -> baseline
+  baseline   -> part2
+  part2      -> mock
+  mock       -> randomized
+  randomized -> part6
+
+  # Exclusion edges
+  screened   -> excl1   [arrowhead = none, style = dashed]
+  consented  -> excl2   [arrowhead = none, style = dashed]
+  baseline   -> excl3   [arrowhead = none, style = dashed]
+  part2      -> excl4   [arrowhead = none, style = dashed]
+  randomized -> excl5   [arrowhead = none, style = dashed]
+  part6      -> excl6   [arrowhead = none, style = dashed]
+}
+'))
+```
+
+---
+
+# Response Behavior Quality
+
+This section examines how well participants engaged with the EMA protocol.
+
+## Compliance
+
+```{r compliance-summary}
+compliance_df <- study_sample %>%
+  mutate(valid = check_validity(.)) %>%
+  group_by(participant_id) %>%
+  summarise(
+    valid_beeps     = sum(valid, na.rm = TRUE),
+    max_dayno       = max(dayno, na.rm = TRUE),
+    total_possible  = if_else(max_dayno <= 3, 18L, 60L),
+    completion_group = if_else(max_dayno <= 3,
+                               "Part 2 Only (3 days)",
+                               "Parts 2 + 6 (10 days)"),
+    compliance      = valid_beeps / total_possible
+  ) %>%
+  ungroup()
+
+# Summary by group
+compliance_df %>%
+  group_by(completion_group) %>%
+  summarise(
+    n                = n(),
+    mean_valid_beeps = round(mean(valid_beeps), 1),
+    mean_possible    = round(mean(total_possible), 1),
+    mean_compliance  = round(mean(compliance), 3),
+    min_compliance   = round(min(compliance), 3),
+    max_compliance   = round(max(compliance), 3)
+  ) %>%
+  kable(caption = "Compliance summary by study completion group") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = FALSE)
+```
+
+```{r compliance-plot}
+ggplot(compliance_df, aes(x = compliance, fill = completion_group)) +
+  geom_histogram(binwidth = 0.05, boundary = 0, color = "white") +
+  scale_x_continuous(
+    limits = c(0, 1),
+    breaks = seq(0, 1, by = 0.1),
+    labels = scales::percent_format(accuracy = 1)
+  ) +
+  facet_wrap(~ completion_group, ncol = 1) +
+  labs(
+    title = "Distribution of participant compliance by study completion group",
+    x     = "Compliance (% of possible EMA prompts)",
+    y     = "Number of participants"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+## Compliance Trends and Participant Characteristics
+
+`r committee_note("The committee asked whether there are significant trends in non-compliance that should be accounted for (e.g., participant characteristics).")`
+
+```{r compliance-trends}
+# Merge compliance with baseline characteristics
+compliance_chars <- compliance_df %>%
+  left_join(
+    study_sample %>%
+      group_by(participant_id) %>%
+      slice(1) %>%
+      ungroup() %>%
+      select(participant_id, age, gender, race,
+             ftnd_sum, cigsperday, panas_pos, panas_neg),
+    by = "participant_id"
+  )
+
+# Correlations between compliance and continuous baseline variables,
+# with significance stars
+cor_vars <- c("compliance", "age", "ftnd_sum", "cigsperday", "panas_pos", "panas_neg")
+
+cor_data <- compliance_chars %>%
+  select(all_of(cor_vars))
+
+n_vars <- length(cor_vars)
+r_mat  <- matrix(NA, n_vars, n_vars, dimnames = list(cor_vars, cor_vars))
+p_mat  <- matrix(NA, n_vars, n_vars, dimnames = list(cor_vars, cor_vars))
+
+for (i in seq_len(n_vars)) {
+  for (j in seq_len(n_vars)) {
+    if (i == j) {
+      r_mat[i, j] <- 1
+      p_mat[i, j] <- NA
+    } else {
+      test         <- cor.test(cor_data[[i]], cor_data[[j]],
+                               use = "pairwise.complete.obs")
+      r_mat[i, j] <- round(test$estimate, 3)
+      p_mat[i, j] <- test$p.value
+    }
+  }
+}
+
+# Build display matrix with stars appended
+sig_stars <- function(p) {
+  if (is.na(p)) return("")
+  if (p < .001) return("***")
+  if (p < .01)  return("**")
+  if (p < .05)  return("*")
+  if (p < .10)  return(".")
+  return("")
+}
+
+display_mat <- matrix("", n_vars, n_vars, dimnames = list(cor_vars, cor_vars))
+for (i in seq_len(n_vars)) {
+  for (j in seq_len(n_vars)) {
+    if (i == j) {
+      display_mat[i, j] <- "—"
+    } else {
+      display_mat[i, j] <- paste0(r_mat[i, j], sig_stars(p_mat[i, j]))
+    }
+  }
+}
+
+as.data.frame(display_mat) %>%
+  kable(caption = "Correlations between compliance and baseline characteristics. * p < .05, ** p < .01, *** p < .001, . p < .10") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = FALSE)
+```
+
+```{r validity-audit}
+# Add valid column to full dataset first
+study_sample_v <- study_sample %>%
+  mutate(valid = check_validity(.))
+
+# Now summarise per participant per part
+validity_audit <- study_sample_v %>%
+  group_by(participant_id, study_part) %>%
+  summarise(
+    n_total     = n(),
+    n_mood_ok   = sum(!is.na(mood)),
+    n_before_ok = sum(!is.na(before_survey)),
+    n_smoke_ok  = sum(!is.na(smoke)),
+    n_branch_ok = sum(!is.na(pleasant) | !is.na(unpleasant)),
+    n_valid     = sum(valid),
+    pct_valid   = round(sum(valid) / n() * 100, 1),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    study_part = factor(study_part,
+                        levels = c(2, 6),
+                        labels = c("Part 2", "Part 6")),
+    branch_limiting = n_mood_ok == n_smoke_ok &
+                      n_smoke_ok == n_before_ok &
+                      n_branch_ok < n_mood_ok
+  )
+
+# First table: participants where branch is limiting factor
+validity_audit %>%
+  filter(branch_limiting) %>%
+  select(participant_id, study_part, n_total, n_mood_ok,
+         n_branch_ok, n_valid, pct_valid) %>%
+  arrange(participant_id, study_part) %>%
+  kable(caption = "Participants where branch variable (pleasant/unpleasant) is the limiting validity factor") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = FALSE)
+
+# Wide format: drop branch_limiting before pivoting
+validity_wide <- validity_audit %>%
+  select(-branch_limiting) %>%
+  pivot_wider(
+    id_cols     = participant_id,
+    names_from  = study_part,
+    values_from = c(n_total, n_mood_ok, n_before_ok,
+                    n_smoke_ok, n_branch_ok, n_valid, pct_valid),
+    names_glue  = "{study_part}_{.value}"
+  )
+
+# Reattach branch_limiting flags per part after widening
+branch_flags <- validity_audit %>%
+  select(participant_id, study_part, branch_limiting) %>%
+  pivot_wider(
+    id_cols     = participant_id,
+    names_from  = study_part,
+    values_from = branch_limiting,
+    names_glue  = "{study_part}_branch_limiting"
+  )
+
+validity_wide <- validity_wide %>%
+  left_join(branch_flags, by = "participant_id")
+
+# Full audit table
+validity_wide %>%
+  arrange(participant_id) %>%
+  kable(caption = "Participant-level validity audit by study part. n_branch_ok = observations with at least one non-missing pleasant/unpleasant value.") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = FALSE) %>%
+  scroll_box(height = "400px")
+```
+
+```{r compliance-cutoffs}
+# Available cases at different validity thresholds
+bind_rows(lapply(c(40, 50, 60), function(cutoff) {
+  validity_audit %>%
+    group_by(study_part) %>%
+    summarise(
+      threshold = paste0(cutoff, "%"),
+      n_retain  = sum(pct_valid >= cutoff, na.rm = TRUE),
+      .groups = "drop"
+    )
+})) %>%
+  pivot_wider(
+    names_from  = study_part,
+    values_from = n_retain,
+    names_glue  = "{study_part}_n_retain"
+  ) %>%
+  arrange(threshold) %>%
+  kable(caption = "Number of participants meeting validity thresholds by study part") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = FALSE)
+```
+
+## Missingness
+
+```{r missingness}
+vis_miss(study_sample %>% select(mood, smoke, before_survey,
+                                  pleasant, unpleasant, prior_mood,
+                                  smoked_since_last_survey)) +
+  labs(title = "Missingness in key EMA variables") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+## Beep Timing
+
+`r button(text = "Supplementary")`
+
+```{r beep-timing}
+study_sample %>%
+  mutate(valid = check_validity(.)) %>%
+  filter(valid == 1) %>%
+  mutate(time_of_day = hms::as_hms(init_time),
+         weekday = ifelse(wday(init_time, week_start = 1) %in% c(6, 7),
+                          "weekend", "weekday")) %>%
+  ggplot(aes(x = time_of_day)) +
+  geom_histogram(bins = 100, fill = "steelblue", color = "white") +
+  scale_x_time(breaks = scales::date_breaks("2 hours")) +
+  facet_grid(weekday ~ .) +
+  labs(
+    title = "Time of day beeps were started (valid observations only)",
+    x     = "Time of day",
+    y     = "Number of beeps"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+`r endbutton()`
+
+---
+
+# EMA Item Descriptives
+
+This section describes the distributions, variance structure, and temporal patterns of the key EMA variables.
+
+## Distributions
+
+`r button(text = "Description")`
+
+```{r ema-distributions}
+ema_vars <- c("mood", "smoke", "pleasant", "unpleasant", "prior_mood")
+
+study_sample %>%
+  mutate(valid = check_validity(.)) %>%
+  filter(valid == 1) %>%
+  select(all_of(ema_vars)) %>%
+  pivot_longer(everything(), names_to = "variable", values_to = "value") %>%
+  filter(!is.na(value)) %>%
+  ggplot(aes(x = value)) +
+  geom_histogram(bins = 30, fill = "steelblue", color = "white") +
+  facet_wrap(~ variable, scales = "free") +
+  labs(
+    title = "Distributions of key EMA variables (valid observations)",
+    x     = "Value",
+    y     = "Count"
+  ) +
+  theme_minimal()
+```
+
+`r endbutton()`
+
+## Intraclass Correlations (ICCs)
+
+`r committee_note("The committee requested ICCs for key EMA variables to distinguish between- and within-person variance and justify modeling decisions.")`
+
+```{r iccs}
+# Fit null models (random intercept only) and extract ICC
+# ICC = between-person variance / (between-person variance + within-person variance)
+
+compute_icc_lme4 <- function(df, var, id = "participant_id") {
+  
+  df_clean <- df %>%
+    filter(!is.na(.data[[var]])) %>%
+    rename(y = all_of(var), id_var = all_of(id))
+  
+  # Fit null model: outcome ~ 1 + (1 | participant)
+  model <- lmer(y ~ 1 + (1 | id_var), data = df_clean, REML = TRUE)
+  
+  vc <- as.data.frame(VarCorr(model))
+  
+  between_var <- vc$vcov[vc$grp == "id_var"]
+  within_var  <- vc$vcov[vc$grp == "Residual"]
+  total_var   <- between_var + within_var
+  icc         <- between_var / total_var
+  
+  tibble(
+    variable    = var,
+    icc         = round(icc, 3),
+    between_var = round(between_var, 3),
+    within_var  = round(within_var, 3),
+    total_var   = round(total_var, 3),
+    pct_between = round(icc * 100, 1),
+    pct_within  = round((1 - icc) * 100, 1)
+  )
+}
+
+ema_valid <- study_sample %>%
+  mutate(valid = check_validity(.)) %>%
+  filter(valid == 1)
+
+icc_results <- bind_rows(
+  lapply(c("mood", "smoke", "pleasant", "unpleasant", "prior_mood"),
+         compute_icc_lme4, df = ema_valid)
+)
+
+icc_results %>%
+  kable(caption = "Intraclass correlations (ICCs) for key EMA variables. ICCs were estimated using null models (random intercept only) fit with REML via lme4. Between-person variance reflects stable individual differences; within-person variance reflects moment-to-moment fluctuation.") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = FALSE)
+```
+
+## Temporal Patterns
+
+`r button(text = "Description")`
+
+```{r temporal-beepno}
+# Means by beep number within day
+study_sample %>%
+  mutate(valid = check_validity(.)) %>%
+  filter(valid == 1) %>%
+  select(beepno, all_of(c("mood", "smoke", "pleasant", "unpleasant", "prior_mood"))) %>%
+  pivot_longer(-beepno, names_to = "variable", values_to = "value") %>%
+  filter(!is.na(value)) %>%
+  group_by(beepno, variable) %>%
+  summarise(mean_value = mean(value, na.rm = TRUE), .groups = "drop") %>%
+  ggplot(aes(x = beepno, y = mean_value)) +
+  geom_line() +
+  geom_point() +
+  facet_wrap(~ variable, scales = "free_y") +
+  labs(
+    title = "Mean EMA variable values by beep number within day",
+    x     = "Beep number",
+    y     = "Mean value"
+  ) +
+  theme_minimal()
+```
+
+```{r temporal-dayno}
+# Means by study day
+study_sample %>%
+  mutate(valid = check_validity(.)) %>%
+  filter(valid == 1) %>%
+  select(dayno, all_of(c("mood", "smoke", "pleasant", "unpleasant", "prior_mood"))) %>%
+  pivot_longer(-dayno, names_to = "variable", values_to = "value") %>%
+  filter(!is.na(value)) %>%
+  group_by(dayno, variable) %>%
+  summarise(mean_value = mean(value, na.rm = TRUE), .groups = "drop") %>%
+  ggplot(aes(x = dayno, y = mean_value)) +
+  geom_line() +
+  geom_point() +
+  geom_vline(xintercept = 3.5, linetype = "dashed", color = "gray50") +
+  annotate("text", x = 2, y = Inf, label = "Part 2", vjust = 1.5,
+           size = 3, color = "gray40") +
+  annotate("text", x = 7, y = Inf, label = "Part 6", vjust = 1.5,
+           size = 3, color = "gray40") +
+  facet_wrap(~ variable, scales = "free_y") +
+  labs(
+    title = "Mean EMA variable values by study day",
+    x     = "Study day",
+    y     = "Mean value"
+  ) +
+  theme_minimal()
+```
+
+`r endbutton()`
+
+## Condition-Level Means
+
+`r committee_note("The committee requested means for mood and craving across unpleasant, pleasant, and neutral event appraisal conditions.")`
+
+```{r condition-means}
+study_sample %>%
+  mutate(valid = check_validity(.)) %>%
+  filter(valid == 1, !is.na(before_survey)) %>%
+  group_by(before_survey) %>%
+  summarise(
+    n          = n(),
+    mean_mood  = round(mean(mood, na.rm = TRUE), 2),
+    sd_mood    = round(sd(mood, na.rm = TRUE), 2),
+    mean_smoke = round(mean(smoke, na.rm = TRUE), 2),
+    sd_smoke   = round(sd(smoke, na.rm = TRUE), 2)
+  ) %>%
+  kable(caption = "Means and SDs for mood and craving by event appraisal condition") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = FALSE)
+```
+
+---
+
+# Smoking Behavior
+
+`r committee_note("This section addresses several committee questions about cigarette use behavior over the course of the study.")`
+
+## Person-Level Cigarette Use
+
+`r committee_note("The committee requested a description of person-level cigarette use behavior over the course of the study.")`
+
+`r button(text = "Description")`
+
+```{r person-smoking}
+# Identify Part 6 completers
+part6_completers <- study_sample %>%
+  filter(study_part == 6) %>%
+  distinct(participant_id) %>%
+  pull(participant_id)
+
+# Daily smoking totals per participant per day
+smoking_person <- study_sample %>%
+  mutate(valid = check_validity(.)) %>%
+  filter(valid == 1, !is.na(smoked_since_last_survey), !is.na(dayno)) %>%
+  group_by(participant_id, dayno) %>%
+  summarise(
+    daily_smoked = sum(smoked_since_last_survey, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(completer = ifelse(participant_id %in% part6_completers,
+                            "Part 6 Completer", "Part 2 Only"))
+
+# --- Plot 1: Color-coded spaghetti ---
+ggplot(smoking_person, aes(x = dayno, y = daily_smoked,
+                            group = participant_id,
+                            color = completer,
+                            alpha = completer)) +
+  geom_line() +
+  geom_vline(xintercept = 3.5, linetype = "dashed", color = "gray40") +
+  scale_color_manual(values = c("Part 6 Completer" = "steelblue",
+                                 "Part 2 Only"      = "gray70")) +
+  scale_alpha_manual(values = c("Part 6 Completer" = 0.5,
+                                 "Part 2 Only"      = 0.3)) +
+  scale_x_continuous(breaks = 1:10) +
+  annotate("text", x = 2, y = Inf, label = "Part 2\n(Baseline)",
+           vjust = 1.5, size = 3, color = "gray40") +
+  annotate("text", x = 7, y = Inf, label = "Part 6\n(Incentive)",
+           vjust = 1.5, size = 3, color = "gray40") +
+  labs(
+    title = "Person-level daily cigarette use over the study",
+    x     = "Study day",
+    y     = "Cigarettes reported",
+    color = "Completion status",
+    alpha = "Completion status"
+  ) +
+  theme_minimal()
+
+# --- Plot 2: Part 6 completers, separate smoothers by study part ---
+smoking_completers <- smoking_person %>%
+  filter(completer == "Part 6 Completer") %>%
+  mutate(part = ifelse(dayno <= 3, "Part 2 (Baseline)", "Part 6 (Incentive)"))
+
+ggplot(smoking_completers, aes(x = dayno, y = daily_smoked)) +
+  geom_line(aes(group = participant_id), color = "steelblue", alpha = 0.3) +
+  geom_smooth(aes(group = part, color = part),
+              method = "lm", se = TRUE, linewidth = 1) +
+  geom_vline(xintercept = 3.5, linetype = "dashed", color = "gray40") +
+  scale_color_manual(values = c("Part 2 (Baseline)"  = "gray40",
+                                 "Part 6 (Incentive)" = "darkblue")) +
+  scale_x_continuous(breaks = 1:10) +
+  annotate("text", x = 2, y = Inf, label = "Part 2\n(Baseline)",
+           vjust = 1.5, size = 3, color = "gray40") +
+  annotate("text", x = 7, y = Inf, label = "Part 6\n(Incentive)",
+           vjust = 1.5, size = 3, color = "gray40") +
+  labs(
+    title = "Daily cigarette use among Part 6 completers",
+    subtitle = "Individual trajectories (light) with separate smoothers by study part",
+    x     = "Study day",
+    y     = "Cigarettes reported",
+    color = "Study part"
+  ) +
+  theme_minimal()
+
+# --- Plot 3: Deviation from baseline, color-coded by change category ---
+
+# Compute Part 2 baseline mean per person
+baseline_ref <- smoking_completers %>%
+  filter(dayno <= 3) %>%
+  group_by(participant_id) %>%
+  summarise(baseline_mean = mean(daily_smoked, na.rm = TRUE),
+            .groups = "drop")
+
+# Part 6 data only, with deviation from baseline
+part6_deviation <- smoking_completers %>%
+  filter(dayno > 3) %>%
+  left_join(baseline_ref, by = "participant_id") %>%
+  mutate(deviation = daily_smoked - baseline_mean)
+
+# Classify each participant by their mean Part 6 deviation
+# Quitter  = Part 6 mean == 0 (or effectively zero, <= 0.1 to handle rounding)
+# Reducer  = Part 6 mean < baseline by > 20%
+# Stable   = within 20% of baseline in either direction
+# Increaser = Part 6 mean > baseline by > 20%
+person_class <- part6_deviation %>%
+  group_by(participant_id, baseline_mean) %>%
+  summarise(part6_mean = mean(daily_smoked, na.rm = TRUE),
+            .groups = "drop") %>%
+  mutate(
+    change_cat = case_when(
+      part6_mean <= 0.1                                    ~ "Quitter",
+      part6_mean < baseline_mean * 0.80                   ~ "Reducer",
+      part6_mean > baseline_mean * 1.20                   ~ "Increaser",
+      TRUE                                                 ~ "Stable"
+    )
+  )
+
+# Print classification counts — useful to verify your hunch
+cat("Change category counts:\n")
+print(table(person_class$change_cat))
+
+# Merge classification back
+part6_deviation <- part6_deviation %>%
+  left_join(person_class %>% select(participant_id, change_cat),
+            by = "participant_id")
+
+# Plot
+ggplot(part6_deviation, aes(x = dayno, y = deviation,
+                             group = participant_id,
+                             color = change_cat)) +
+  geom_line(alpha = 0.5) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray40", linewidth = 0.8) +
+  scale_color_manual(
+    values = c(
+      "Quitter"   = "darkgreen",
+      "Reducer"   = "steelblue",
+      "Stable"    = "gray60",
+      "Increaser" = "tomato"
+    )
+  ) +
+  scale_x_continuous(breaks = 4:10) +
+  annotate("text", x = 6.5, y = Inf,
+           label = "Dashed line = individual Part 2 baseline mean",
+           vjust = 1.5, size = 2.8, color = "gray40") +
+  labs(
+    title = "Part 6 smoking deviations from individual Part 2 baselines",
+    subtitle = "Quitter = zero Part 6 smoking; Reducer = >20% below baseline;\nStable = within 20%; Increaser = >20% above baseline",
+    x     = "Study day",
+    y     = "Deviation from baseline (cigarettes reported)",
+    color = "Change category"
+  ) +
+  theme_minimal()
+```
+
+`r endbutton()`
+
+## 3-Day Baseline Smoking
+
+`r committee_note("The committee requested that 3-day EMA cigarette smoking data be used to calculate each participant's typical smoking behavior as a baseline metric for assessing relative deviations during Part 6.")`
+
+```{r baseline-smoking}
+# --- Table 1: Part 2 vs Part 6 smoking summary for completers ---
+
+# Part 2 summary — all participants
+part2_all <- study_sample %>%
+  mutate(valid = check_validity(.)) %>%
+  filter(valid == 1, study_part == 2, !is.na(smoked_since_last_survey)) %>%
+  group_by(participant_id) %>%
+  summarise(
+    baseline_total = sum(smoked_since_last_survey, na.rm = TRUE),
+    baseline_days  = n_distinct(dayno),
+    baseline_daily = round(baseline_total / baseline_days, 2),
+    .groups = "drop"
+  )
+
+# Part 2 summary — completers only
+part2_completers <- part2_all %>%
+  filter(participant_id %in% part6_completers)
+
+# Part 6 summary — completers only
+part6_summary <- study_sample %>%
+  mutate(valid = check_validity(.)) %>%
+  filter(valid == 1, study_part == 6, !is.na(smoked_since_last_survey)) %>%
+  group_by(participant_id) %>%
+  summarise(
+    part6_total = sum(smoked_since_last_survey, na.rm = TRUE),
+    part6_days  = n_distinct(dayno),
+    part6_daily = round(part6_total / part6_days, 2),
+    .groups = "drop"
+  )
+
+# Build comparison table
+tibble(
+  Sample = c("Part 2 completers",
+           "Part 6 completers — Part 2 (baseline)",
+           "Part 6 completers — Part 6 (incentive)"),
+N = c(
+  nrow(part2_completers),
+  nrow(part2_completers),
+  nrow(part6_summary)
+),
+Mean_daily = c(
+  round(mean(part2_completers$baseline_daily, na.rm = TRUE), 2),
+  round(mean(part2_completers$baseline_daily, na.rm = TRUE), 2),
+  round(mean(part6_summary$part6_daily, na.rm = TRUE), 2)
+),
+  SD_daily                = c(
+    round(sd(part2_all$baseline_daily, na.rm = TRUE), 2),
+    round(sd(part2_completers$baseline_daily, na.rm = TRUE), 2),
+    round(sd(part6_summary$part6_daily, na.rm = TRUE), 2)
+  ),
+  Min_daily               = c(
+    min(part2_all$baseline_daily, na.rm = TRUE),
+    min(part2_completers$baseline_daily, na.rm = TRUE),
+    min(part6_summary$part6_daily, na.rm = TRUE)
+  ),
+  Max_daily               = c(
+    max(part2_all$baseline_daily, na.rm = TRUE),
+    max(part2_completers$baseline_daily, na.rm = TRUE),
+    max(part6_summary$part6_daily, na.rm = TRUE)
+  )
+) %>%
+  kable(caption = "Daily cigarette use summary by sample and study part") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = FALSE)
+
+# --- Table 2: Change category summary ---
+# Recompute person_class here in case chunk is run independently
+person_class_summary <- part2_completers %>%
+  left_join(part6_summary, by = "participant_id") %>%
+  mutate(
+    change_cat = case_when(
+      part6_daily <= 0.1                          ~ "Quitter",
+      part6_daily < baseline_daily * 0.80         ~ "Reducer",
+      part6_daily > baseline_daily * 1.20         ~ "Increaser",
+      TRUE                                         ~ "Stable"
+    )
+  )
+
+person_class_summary %>%
+  group_by(change_cat) %>%
+  summarise(
+    n                    = n(),
+    pct                  = round(n() / nrow(person_class_summary) * 100, 1),
+    mean_baseline_daily  = round(mean(baseline_daily, na.rm = TRUE), 2),
+    sd_baseline_daily    = round(sd(baseline_daily, na.rm = TRUE), 2),
+    mean_part6_daily     = round(mean(part6_daily, na.rm = TRUE), 2),
+    sd_part6_daily       = round(sd(part6_daily, na.rm = TRUE), 2),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(n)) %>%
+  kable(caption = "Part 6 smoking change categories relative to Part 2 baseline. Quitter = mean Part 6 daily smoking <= 0.1; Reducer = >20% below baseline; Increaser = >20% above baseline; Stable = within 20% of baseline.") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = FALSE)
+
+```
+
+
+## CO and EMA Alignment
+
+`r committee_note("The committee asked whether the CO data align with the EMA data on cigarette smoking for each participant.")`
+
+`r button(text = "Description")`
+
+```{r co-ema-alignment}
+# Compare CO-verified smoking status with EMA-reported smoking
+co_ema <- study_sample %>%
+  filter(!is.na(co_level), !is.na(co_state_smoked)) %>%
+  group_by(participant_id, dayno) %>%
+  summarise(
+    ema_smoked_any  = any(smoked_since_last_survey > 0, na.rm = TRUE),
+    co_smoked       = first(co_state_smoked),
+    co_level        = first(co_level),
+    .groups = "drop"
+  ) %>%
+  filter(!is.na(co_smoked))
+
+# Agreement table
+co_ema %>%
+  mutate(
+    agreement = case_when(
+      ema_smoked_any == TRUE  & co_smoked == TRUE  ~ "Both: smoked",
+      ema_smoked_any == FALSE & co_smoked == FALSE ~ "Both: did not smoke",
+      ema_smoked_any == TRUE  & co_smoked == FALSE ~ "EMA: smoked, CO: did not",
+      ema_smoked_any == FALSE & co_smoked == TRUE  ~ "EMA: did not, CO: smoked",
+      TRUE ~ "Indeterminate"
+    )
+  ) %>%
+  count(agreement) %>%
+  mutate(pct = round(n / sum(n) * 100, 1)) %>%
+  kable(caption = "Agreement between EMA-reported and CO-verified smoking") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = FALSE)
+```
+
+`r endbutton()`
+
+---
+
+# Abstinence Incentive
+
+`r committee_note("This section addresses the committee's question about the effect of the abstinence incentive. Analyses are framed descriptively to inform future modeling decisions.")`
+
+```{r incentive-effect}
+# Compare smoking behavior between Part 2 and Part 6
+incentive_compare <- study_sample %>%
+  mutate(valid = check_validity(.)) %>%
+  filter(valid == 1, !is.na(smoked_since_last_survey)) %>%
+  group_by(participant_id, study_part) %>%
+  summarise(
+    mean_smoked = mean(smoked_since_last_survey, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(study_part = factor(study_part,
+                              levels = c(2, 6),
+                              labels = c("Part 2 (Baseline)", "Part 6 (Incentive)")))
+
+# Summary
+incentive_compare %>%
+  group_by(study_part) %>%
+  summarise(
+    n           = n(),
+    mean_smoked = round(mean(mean_smoked, na.rm = TRUE), 2),
+    sd_smoked   = round(sd(mean_smoked, na.rm = TRUE), 2)
+  ) %>%
+  kable(caption = "Mean cigarettes reported per beep by study part") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = FALSE)
+```
+
+```{r incentive-plot}
+ggplot(incentive_compare, aes(x = study_part, y = mean_smoked,
+                               fill = study_part)) +
+  geom_boxplot(alpha = 0.7) +
+  geom_jitter(width = 0.1, alpha = 0.4, size = 1) +
+  labs(
+    title = "Cigarette use by study part",
+    x     = "Study part",
+    y     = "Mean cigarettes reported per beep"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+*Note: Formal tests of the incentive effect are reserved for the main analyses. The above is intended to inform whether smoking behavior changed between parts and whether this should be considered in future modeling.*
+
+---
+
+# Available Cases
+
+`r committee_note("The committee requested the number of available cases for each Aim, including a CONSORT diagram.")`
+
+```{r available-cases}
+# Part 2 participants (Aims 1 and 2)
+n_aim1_2 <- study_sample %>%
+  filter(study_part == 2) %>%
+  mutate(valid = check_validity(.)) %>%
+  filter(valid == 1) %>%
+  distinct(participant_id) %>%
+  nrow()
+
+# Part 6 participants (Aim 3)
+n_aim3 <- study_sample %>%
+  filter(study_part == 6) %>%
+  mutate(valid = check_validity(.)) %>%
+  filter(valid == 1) %>%
+  distinct(participant_id) %>%
+  nrow()
+
+# Valid observations
+n_obs_aim1_2 <- study_sample %>%
+  filter(study_part == 2) %>%
+  mutate(valid = check_validity(.)) %>%
+  filter(valid == 1) %>%
+  nrow()
+
+n_obs_aim3 <- study_sample %>%
+  filter(study_part == 6) %>%
+  mutate(valid = check_validity(.)) %>%
+  filter(valid == 1) %>%
+  nrow()
+
+tibble(
+  Aim            = c("Aims 1 & 2 (Part 2)", "Aim 3 (Part 6)"),
+  N_participants = c(n_aim1_2, n_aim3),
+  N_observations = c(n_obs_aim1_2, n_obs_aim3)
+) %>%
+  kable(caption = "Available cases by Aim") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = FALSE)
+```
+
+*See Section 3 for the CONSORT diagram documenting participant flow.*
+
+---
+
+# References
+
+Revol, J., Carlier, C., Lafit, G., Verhees, M., Sels, L., & Ceulemans, E. (2024). Preprocessing ESM data: A step-by-step framework, tutorial website, R package, and reporting templates. *Advances in Methods and Practices in Psychological Science, 7*(4), 1--18. https://doi.org/10.1177/25152459241256609
