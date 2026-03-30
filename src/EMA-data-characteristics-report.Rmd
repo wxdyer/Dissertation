@@ -294,7 +294,9 @@ cont_table %>%
 # --- Table 2: Gender ---
 cat("\n")
 baseline_chars %>%
-  mutate(gender = as.character(gender)) %>%
+  mutate(gender = recode(as.character(gender),
+                         "1" = "Male",
+                         "2" = "Female")) %>%
   count(gender) %>%
   mutate(pct = round(n / sum(n) * 100, 1)) %>%
   rename(Gender = gender, N = n, `%` = pct) %>%
@@ -676,7 +678,7 @@ study_sample %>%
 
 `r committee_note("The committee requested examination of how baseline participant characteristics relate to study engagement and key EMA outcomes. Results are organized thematically and are intended to inform covariate selection and interpretation of individual differences in the main analyses.")`
 
-This section examines associations between baseline participant characteristics and two sets of outcomes: (1) study engagement indicators (compliance, attrition, valid observations) and (2) person-level means of key EMA outcomes (craving, mood, pleasant event appraisal ratings, unpleasant event appraisal ratings, and prior mood). All EMA outcome means are computed at the person level from valid observations. For continuous predictors, Pearson correlations with significance stars are reported. For categorical predictors (gender), group means are compared.
+This section examines associations between baseline participant characteristics and two sets of outcomes: (1) study engagement indicators (compliance, attrition, valid observations) and (2) person-level means of key EMA outcomes (craving, mood, pleasant event appraisal ratings, unpleasant event appraisal ratings, and prior mood). All EMA outcome means are computed at the person level from valid observations. For continuous predictors, Pearson correlations with significance stars are reported. For gender, independent samples t-tests are used to compare means between Male and Female participants.
 
 ```{r characteristics-prep}
 # Person-level EMA outcome means (valid observations only)
@@ -700,10 +702,14 @@ engagement <- compliance_df %>%
   mutate(attrition = ifelse(completion_group == "Part 2 Only (3 days)", 1, 0))
 
 # One row per participant with all characteristics
+# Gender labeled: 1 = Male, 2 = Female
 chars_outcomes <- baseline_chars %>%
   select(participant_id, age, gender, total_household_income, bank_balance,
          ftnd_sum, cigsperday, shaps_sim_sum, panas_pos, panas_neg,
          q23, q24, q25, q71, q80) %>%
+  mutate(gender = recode(as.character(gender),
+                         "1" = "Male",
+                         "2" = "Female")) %>%
   left_join(engagement, by = "participant_id") %>%
   left_join(ema_person_means, by = "participant_id")
 
@@ -747,15 +753,16 @@ outcome_labels <- c("Craving", "Mood", "Pleasant\nRating",
                     "Unpleasant\nRating", "Prior Mood")
 ```
 
-## Theme 1: Substance Use History & Developmental Factors
+## Theme 1: Personal Characteristics & Substance Use History
 
-`r committee_note("The committee requested examination of how smoking history and substance use characteristics relate to study engagement and key EMA outcomes.")`
+`r committee_note("The committee requested examination of how personal characteristics, smoking history, and substance use relate to study engagement and key EMA outcomes.")`
 
 ### Association with Study Engagement
 
 ```{r theme1-engagement}
-pred1 <- c("ftnd_sum", "cigsperday", "q23", "q24", "q25", "q71", "q80")
+pred1 <- c("age", "ftnd_sum", "cigsperday", "q23", "q24", "q25", "q71", "q80")
 pred1_labels <- c(
+  age         = "Age",
   ftnd_sum    = "Nicotine dependence (FTND)",
   cigsperday  = "Cigarettes per day",
   q23         = "Age at first puff",
@@ -771,7 +778,7 @@ cor_table(
   outcomes       = engagement_vars,
   pred_labels    = pred1_labels,
   outcome_labels = engagement_labels,
-  caption        = "Theme 1: Substance use history and developmental factors — associations with study engagement. * p < .05, ** p < .01, *** p < .001, . p < .10"
+  caption        = "Theme 1: Personal characteristics and substance use history — associations with study engagement. * p < .05, ** p < .01, *** p < .001, . p < .10"
 )
 ```
 
@@ -784,7 +791,7 @@ cor_table(
   outcomes       = outcome_vars,
   pred_labels    = pred1_labels,
   outcome_labels = outcome_labels,
-  caption        = "Theme 1: Substance use history and developmental factors — associations with key EMA outcomes. * p < .05, ** p < .01, *** p < .001, . p < .10"
+  caption        = "Theme 1: Personal characteristics and substance use history — associations with key EMA outcomes. * p < .05, ** p < .01, *** p < .001, . p < .10"
 )
 ```
 
@@ -825,108 +832,68 @@ cor_table(
 )
 ```
 
-## Theme 3: Demographics
+## Theme 3: Gender
 
-`r committee_note("The committee requested examination of how demographic characteristics relate to study engagement and key EMA outcomes.")`
+`r committee_note("The committee requested examination of gender differences in study engagement and key EMA outcomes. Independent samples t-tests compare Male and Female participants on each outcome.")`
 
-### Continuous Demographics — Association with Study Engagement
-
-```{r theme3-engagement-cont}
-pred3_cont <- c("age", "bank_balance")
-pred3_cont_labels <- c(
-  age          = "Age",
-  bank_balance = "Bank balance ($)"
-)
-
-cor_table(
-  data           = chars_outcomes,
-  predictors     = pred3_cont,
-  outcomes       = engagement_vars,
-  pred_labels    = pred3_cont_labels,
-  outcome_labels = engagement_labels,
-  caption        = "Theme 3: Continuous demographics — associations with study engagement. * p < .05, ** p < .01, *** p < .001, . p < .10"
-)
-```
-
-### Continuous Demographics — Association with Key EMA Outcomes
-
-```{r theme3-outcomes-cont}
-cor_table(
-  data           = chars_outcomes,
-  predictors     = pred3_cont,
-  outcomes       = outcome_vars,
-  pred_labels    = pred3_cont_labels,
-  outcome_labels = outcome_labels,
-  caption        = "Theme 3: Continuous demographics — associations with key EMA outcomes. * p < .05, ** p < .01, *** p < .001, . p < .10"
-)
-```
-
-### Gender — Group Means by Study Engagement and EMA Outcomes
+### Gender Differences in Study Engagement and Key EMA Outcomes
 
 ```{r theme3-gender}
-chars_outcomes %>%
-  filter(!is.na(gender)) %>%
-  group_by(gender) %>%
-  summarise(
-    n                = n(),
-    mean_compliance  = round(mean(compliance, na.rm = TRUE), 2),
-    mean_n_valid     = round(mean(n_valid, na.rm = TRUE), 1),
-    pct_attrition    = round(mean(attrition, na.rm = TRUE) * 100, 1),
-    mean_craving     = round(mean(mean_craving, na.rm = TRUE), 2),
-    mean_mood        = round(mean(mean_mood, na.rm = TRUE), 2),
-    mean_pleasant    = round(mean(mean_pleasant, na.rm = TRUE), 2),
-    mean_unpleasant  = round(mean(mean_unpleasant, na.rm = TRUE), 2),
-    mean_prior_mood  = round(mean(mean_prior_mood, na.rm = TRUE), 2),
-    .groups = "drop"
-  ) %>%
-  rename(
-    Gender              = gender,
-    N                   = n,
-    `Mean Compliance`   = mean_compliance,
-    `Mean N Valid`      = mean_n_valid,
-    `% Attrition`       = pct_attrition,
-    `Mean Craving`      = mean_craving,
-    `Mean Mood`         = mean_mood,
-    `Mean Pleasant`     = mean_pleasant,
-    `Mean Unpleasant`   = mean_unpleasant,
-    `Mean Prior Mood`   = mean_prior_mood
-  ) %>%
-  kable(caption = "Theme 3: Gender — group means for study engagement and key EMA outcomes") %>%
-  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
-                full_width = FALSE) %>%
-  scroll_box(width = "100%")
-```
+# Build a reusable t-test table for gender comparisons
+gender_ttest <- function(data, outcomes, outcome_labels) {
+  
+  sig_stars <- function(p) {
+    if (is.na(p)) return("")
+    if (p < .001) return("***")
+    if (p < .01)  return("**")
+    if (p < .05)  return("*")
+    if (p < .10)  return(".")
+    return("")
+  }
+  
+  map_dfr(seq_along(outcomes), function(i) {
+    out   <- outcomes[i]
+    label <- outcome_labels[i]
+    
+    male   <- data %>% filter(gender == "Male")   %>% pull(!!sym(out))
+    female <- data %>% filter(gender == "Female") %>% pull(!!sym(out))
+    
+    male   <- male[!is.na(male)]
+    female <- female[!is.na(female)]
+    
+    ttest <- t.test(male, female)
+    
+    tibble(
+      Outcome         = label,
+      `Male M (SD)`   = paste0(round(mean(male), 2),
+                                " (", round(sd(male), 2), ")"),
+      `Female M (SD)` = paste0(round(mean(female), 2),
+                                " (", round(sd(female), 2), ")"),
+      `t`             = round(ttest$statistic, 2),
+      `df`            = round(ttest$parameter, 1),
+      `p`             = paste0(round(ttest$p.value, 3),
+                                sig_stars(ttest$p.value))
+    )
+  })
+}
 
-### Income — Group Means by Study Engagement and EMA Outcomes
+all_outcomes      <- c(engagement_vars, outcome_vars)
+all_outcome_labels <- c("Compliance", "Attrition (1=Part2 only)",
+                         "N Valid Observations",
+                         "Craving", "Mood", "Pleasant Rating",
+                         "Unpleasant Rating", "Prior Mood")
 
-```{r theme3-income}
-chars_outcomes %>%
-  filter(!is.na(total_household_income)) %>%
-  mutate(income = as.character(total_household_income)) %>%
-  group_by(income) %>%
-  summarise(
-    n                = n(),
-    mean_compliance  = round(mean(compliance, na.rm = TRUE), 2),
-    pct_attrition    = round(mean(attrition, na.rm = TRUE) * 100, 1),
-    mean_craving     = round(mean(mean_craving, na.rm = TRUE), 2),
-    mean_mood        = round(mean(mean_mood, na.rm = TRUE), 2),
-    .groups = "drop"
-  ) %>%
-  arrange(income) %>%
-  rename(
-    `Household Income`  = income,
-    N                   = n,
-    `Mean Compliance`   = mean_compliance,
-    `% Attrition`       = pct_attrition,
-    `Mean Craving`      = mean_craving,
-    `Mean Mood`         = mean_mood
-  ) %>%
-  kable(caption = "Theme 3: Household income — group means for study engagement and key EMA outcomes. All income categories shown.") %>%
+gender_ttest(
+  data            = chars_outcomes,
+  outcomes        = all_outcomes,
+  outcome_labels  = all_outcome_labels
+) %>%
+  kable(caption = "Theme 3: Gender differences in study engagement and key EMA outcomes. Independent samples t-tests (Welch). * p < .05, ** p < .01, *** p < .001, . p < .10") %>%
   kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
                 full_width = FALSE)
 ```
 
-`r section_summary("Associations between baseline participant characteristics and study engagement and EMA outcomes are examined across three thematic groupings: substance use history and developmental factors, trait affect and reward sensitivity, and demographics. Results are descriptive and intended to inform covariate selection, interpretation of individual differences, and potential confounds in the main analyses.")`
+`r section_summary("Associations between baseline participant characteristics and study engagement and EMA outcomes are examined across three thematic groupings: personal characteristics and substance use history (including age, smoking history, e-cigarette and cannabis use), trait affect and reward sensitivity, and gender. Results are descriptive and intended to inform covariate selection, interpretation of individual differences, and potential confounds in the main analyses.")`
 
 ---
 
