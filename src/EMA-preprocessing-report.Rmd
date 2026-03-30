@@ -390,7 +390,10 @@ baseline_clean <- baseline %>%
     cigsperday,
     shaps_sim_sum,
     panas_pos,
-    panas_neg
+    panas_neg,
+    q23, q24, q25, #age of first cig puff, age of first full cig, age when smoking regularly began
+    q80, #past 30-day marijuana use
+    q71, #past 30-day e-cig use
   )
 ```
 
@@ -415,7 +418,10 @@ baseline_vars <- c(
   "cigsperday",
   "shaps_sim_sum",
   "panas_pos",
-  "panas_neg"
+  "panas_neg",
+  "q23", "q24", "q25", 
+    "q80", 
+    "q71"
 )
 
 # Merge and reorder in a single step
@@ -813,6 +819,31 @@ study_sample %>%
   group_by(participant_id) %>%
   summarise(n_cigsperday_values = n_distinct(cigsperday)) %>%
   filter(n_cigsperday_values > 1)
+
+study_sample %>%
+  group_by(participant_id) %>%
+  summarise(n_q23_values = n_distinct(q23)) %>% # Q23: Age at first cigarette (even a puff)
+  filter(n_q23_values > 1)
+
+study_sample %>%
+  group_by(participant_id) %>%
+  summarise(n_q24_values = n_distinct(q24)) %>% # Q24: Age at first full cigarette
+  filter(n_q24_values > 1)
+
+study_sample %>%
+  group_by(participant_id) %>%
+  summarise(n_q25_values = n_distinct(q25)) %>% # Q25: Age first started smoking regularly
+  filter(n_q25_values > 1)
+
+study_sample %>%
+  group_by(participant_id) %>%
+  summarise(n_q71_values = n_distinct(q71)) %>% # Q71: E-cigarette use frequency (past 30 days)
+  filter(n_q71_values > 1)
+
+study_sample %>%
+  group_by(participant_id) %>%
+  summarise(n_q80_values = n_distinct(q80)) %>% # Q80: Cannabis use frequency (past 30 days)
+  filter(n_q80_values > 1)
 ```
 
 `r endbutton()` 
