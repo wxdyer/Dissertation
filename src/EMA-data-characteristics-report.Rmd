@@ -76,7 +76,10 @@ $(document).ready(function() {
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+library(esmtools)
 ```
+
+`r button(text = "Supplementary")`
 
 ```{r packages, message=FALSE, warning=FALSE}
 # Data management
@@ -84,6 +87,7 @@ library(dplyr)
 library(tidyr)
 library(here)
 library(htmltools)
+library(purrr)
 
 # EMA preprocessing tools
 library(esmtools)
@@ -160,6 +164,8 @@ valid_completers <- study_sample %>%
   pull(participant_id)
 ```
 
+`r endbutton()`
+
 ---
 
 # Overview
@@ -216,7 +222,12 @@ var_info <- tibble::tribble(
   "co_level",                 "Numeric",       "Biochemical verification",   "parts per million",
   "co_date",                  "Date",          "Biochemical verification",   "Date",
   "co_state_smoked",          "Logical",       "Biochemical verification",   "TRUE/FALSE",
-  "co_correct_procedure",     "Logical",       "Biochemical verification",   "TRUE/FALSE"
+  "co_correct_procedure",     "Logical",       "Biochemical verification",   "TRUE/FALSE",
+  "q23",                      "Numeric",       "Baseline covariate",         "Years",
+  "q24",                      "Numeric",       "Baseline covariate",         "Years",
+  "q25",                      "Numeric",       "Baseline covariate",         "Years",
+  "q71",                      "Numeric",       "Baseline covariate",         "Times in past 30 days",
+  "q80",                      "Numeric",       "Baseline covariate",         "Times in past 30 days"
 )
 
 kable(var_info, caption = "Variable descriptions for the preprocessed DVAL EMA dataset") %>%
@@ -244,29 +255,54 @@ baseline_chars <- study_sample %>%
   slice(1) %>%
   ungroup()
 
-# N total
 cat("Total participants:", nrow(baseline_chars), "\n")
 
-# Age
-cat("\nAge:\n")
-baseline_chars %>%
-  summarise(
-    n = sum(!is.na(age)),
-    mean = round(mean(age, na.rm = TRUE), 2),
-    sd   = round(sd(age, na.rm = TRUE), 2),
-    min  = min(age, na.rm = TRUE),
-    max  = max(age, na.rm = TRUE)
-  ) %>% print()
+# --- Table 1: Continuous variables ---
+cont_vars <- tibble::tribble(
+  ~Variable,                          ~col,
+  "Age (years)",                      "age",
+  "Cigarettes per day (baseline)",    "cigsperday",
+  "FTND total score",                 "ftnd_sum",
+  "SHAPS score",                      "shaps_sim_sum",
+  "PANAS positive affect",            "panas_pos",
+  "PANAS negative affect",            "panas_neg",
+  "Bank balance ($)",                 "bank_balance",
+  "Age at first puff",                "q23",
+  "Age at first full cigarette",      "q24",
+  "Age at regular smoking onset",     "q25",
+  "E-cigarette use (past 30 days)",   "q71",
+  "Cannabis use (past 30 days)",      "q80"
+)
 
-# Gender
-cat("\nGender:\n")
+cont_table <- cont_vars %>%
+  rowwise() %>%
+  mutate(
+    n    = sum(!is.na(baseline_chars[[col]])),
+    Mean = round(mean(baseline_chars[[col]], na.rm = TRUE), 2),
+    SD   = round(sd(baseline_chars[[col]], na.rm = TRUE), 2),
+    Min  = round(min(baseline_chars[[col]], na.rm = TRUE), 2),
+    Max  = round(max(baseline_chars[[col]], na.rm = TRUE), 2)
+  ) %>%
+  ungroup() %>%
+  select(Variable, n, Mean, SD, Min, Max)
+
+cont_table %>%
+  kable(caption = "Descriptive statistics for continuous baseline variables") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = FALSE)
+
+# --- Table 2: Gender ---
+cat("\n")
 baseline_chars %>%
+  mutate(gender = as.character(gender)) %>%
   count(gender) %>%
   mutate(pct = round(n / sum(n) * 100, 1)) %>%
-  print()
+  rename(Gender = gender, N = n, `%` = pct) %>%
+  kable(caption = "Gender") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = FALSE)
 
-# Race
-cat("\nRace:\n")
+# --- Table 3: Race ---
 race_labels <- c(
   "1" = "American Indian or Alaska Native",
   "2" = "Asian",
@@ -276,18 +312,26 @@ race_labels <- c(
   "6" = "More than one race",
   "7" = "Unknown or prefer not to answer"
 )
+
 baseline_chars %>%
   mutate(race = recode(as.character(race), !!!race_labels)) %>%
   count(race) %>%
   mutate(pct = round(n / sum(n) * 100, 1)) %>%
-  print()
+  rename(Race = race, N = n, `%` = pct) %>%
+  kable(caption = "Race/ethnicity") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = FALSE)
 
-# Income
-cat("\nHousehold income:\n")
+# --- Table 4: Household income ---
 baseline_chars %>%
+  mutate(total_household_income = as.character(total_household_income)) %>%
   count(total_household_income) %>%
   mutate(pct = round(n / sum(n) * 100, 1)) %>%
-  print()
+  arrange(total_household_income) %>%
+  rename(`Household Income` = total_household_income, N = n, `%` = pct) %>%
+  kable(caption = "Household income — all categories shown") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = FALSE)
 ```
 
 `r endbutton()`
@@ -625,6 +669,264 @@ study_sample %>%
 `r endbutton()`
 
 `r section_summary("Overall compliance was generally good across participants, though variability was present. Compliance trends were examined in relation to baseline participant characteristics to assess whether non-compliance was systematic. A participant-level validity audit identified cases where the branch variable (pleasant/unpleasant) was the limiting factor for observation-level validity — notably, participant 223 had zero valid observations during Part 6 and only 2 during Part 2, rendering them unusable for analyses requiring the full validity criteria. Missingness was concentrated in the branch variables, consistent with the branching structure of the survey. Beep timing followed the expected 2-hour interval sampling scheme across weekdays and weekends.")`
+
+---
+
+# Participant Characteristics and Study Outcomes
+
+`r committee_note("The committee requested examination of how baseline participant characteristics relate to study engagement and key EMA outcomes. Results are organized thematically and are intended to inform covariate selection and interpretation of individual differences in the main analyses.")`
+
+This section examines associations between baseline participant characteristics and two sets of outcomes: (1) study engagement indicators (compliance, attrition, valid observations) and (2) person-level means of key EMA outcomes (craving, mood, pleasant event appraisal ratings, unpleasant event appraisal ratings, and prior mood). All EMA outcome means are computed at the person level from valid observations. For continuous predictors, Pearson correlations with significance stars are reported. For categorical predictors (gender), group means are compared.
+
+```{r characteristics-prep}
+# Person-level EMA outcome means (valid observations only)
+ema_person_means <- study_sample %>%
+  mutate(valid = check_validity(.)) %>%
+  filter(valid == 1) %>%
+  group_by(participant_id) %>%
+  summarise(
+    mean_craving    = mean(smoke, na.rm = TRUE),
+    mean_mood       = mean(mood, na.rm = TRUE),
+    mean_pleasant   = mean(pleasant, na.rm = TRUE),
+    mean_unpleasant = mean(unpleasant, na.rm = TRUE),
+    mean_prior_mood = mean(prior_mood, na.rm = TRUE),
+    n_valid         = sum(!is.na(mood)),
+    .groups = "drop"
+  )
+
+# Compliance and attrition
+engagement <- compliance_df %>%
+  select(participant_id, compliance, completion_group) %>%
+  mutate(attrition = ifelse(completion_group == "Part 2 Only (3 days)", 1, 0))
+
+# One row per participant with all characteristics
+chars_outcomes <- baseline_chars %>%
+  select(participant_id, age, gender, total_household_income, bank_balance,
+         ftnd_sum, cigsperday, shaps_sim_sum, panas_pos, panas_neg,
+         q23, q24, q25, q71, q80) %>%
+  left_join(engagement, by = "participant_id") %>%
+  left_join(ema_person_means, by = "participant_id")
+
+# Reusable correlation table function with significance stars
+cor_table <- function(data, predictors, outcomes,
+                      pred_labels, outcome_labels, caption) {
+  
+  sig_stars <- function(p) {
+    if (is.na(p)) return("")
+    if (p < .001) return("***")
+    if (p < .01)  return("**")
+    if (p < .05)  return("*")
+    if (p < .10)  return(".")
+    return("")
+  }
+  
+  result <- map_dfr(predictors, function(pred) {
+    row <- tibble(Predictor = pred_labels[pred])
+    for (i in seq_along(outcomes)) {
+      out <- outcomes[i]
+      test <- cor.test(data[[pred]], data[[out]], use = "pairwise.complete.obs")
+      row[[outcome_labels[i]]] <- paste0(round(test$estimate, 2),
+                                          sig_stars(test$p.value))
+    }
+    row
+  })
+  
+  result %>%
+    kable(caption = caption) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                  full_width = FALSE)
+}
+
+# Variable label lookups
+engagement_vars   <- c("compliance", "attrition", "n_valid")
+engagement_labels <- c("Compliance", "Attrition\n(1=Part2 only)", "N Valid Obs")
+
+outcome_vars   <- c("mean_craving", "mean_mood", "mean_pleasant",
+                    "mean_unpleasant", "mean_prior_mood")
+outcome_labels <- c("Craving", "Mood", "Pleasant\nRating",
+                    "Unpleasant\nRating", "Prior Mood")
+```
+
+## Theme 1: Substance Use History & Developmental Factors
+
+`r committee_note("The committee requested examination of how smoking history and substance use characteristics relate to study engagement and key EMA outcomes.")`
+
+### Association with Study Engagement
+
+```{r theme1-engagement}
+pred1 <- c("ftnd_sum", "cigsperday", "q23", "q24", "q25", "q71", "q80")
+pred1_labels <- c(
+  ftnd_sum    = "Nicotine dependence (FTND)",
+  cigsperday  = "Cigarettes per day",
+  q23         = "Age at first puff",
+  q24         = "Age at first full cigarette",
+  q25         = "Age at regular smoking onset",
+  q71         = "E-cigarette use (past 30 days)",
+  q80         = "Cannabis use (past 30 days)"
+)
+
+cor_table(
+  data           = chars_outcomes,
+  predictors     = pred1,
+  outcomes       = engagement_vars,
+  pred_labels    = pred1_labels,
+  outcome_labels = engagement_labels,
+  caption        = "Theme 1: Substance use history and developmental factors — associations with study engagement. * p < .05, ** p < .01, *** p < .001, . p < .10"
+)
+```
+
+### Association with Key EMA Outcomes
+
+```{r theme1-outcomes}
+cor_table(
+  data           = chars_outcomes,
+  predictors     = pred1,
+  outcomes       = outcome_vars,
+  pred_labels    = pred1_labels,
+  outcome_labels = outcome_labels,
+  caption        = "Theme 1: Substance use history and developmental factors — associations with key EMA outcomes. * p < .05, ** p < .01, *** p < .001, . p < .10"
+)
+```
+
+## Theme 2: Trait Affect & Reward Sensitivity
+
+`r committee_note("The committee requested examination of how trait affect and reward sensitivity relate to study engagement and key EMA outcomes.")`
+
+### Association with Study Engagement
+
+```{r theme2-engagement}
+pred2 <- c("panas_pos", "panas_neg", "shaps_sim_sum")
+pred2_labels <- c(
+  panas_pos    = "Trait positive affect (PANAS)",
+  panas_neg    = "Trait negative affect (PANAS)",
+  shaps_sim_sum = "Anhedonia (SHAPS)"
+)
+
+cor_table(
+  data           = chars_outcomes,
+  predictors     = pred2,
+  outcomes       = engagement_vars,
+  pred_labels    = pred2_labels,
+  outcome_labels = engagement_labels,
+  caption        = "Theme 2: Trait affect and reward sensitivity — associations with study engagement. * p < .05, ** p < .01, *** p < .001, . p < .10"
+)
+```
+
+### Association with Key EMA Outcomes
+
+```{r theme2-outcomes}
+cor_table(
+  data           = chars_outcomes,
+  predictors     = pred2,
+  outcomes       = outcome_vars,
+  pred_labels    = pred2_labels,
+  outcome_labels = outcome_labels,
+  caption        = "Theme 2: Trait affect and reward sensitivity — associations with key EMA outcomes. * p < .05, ** p < .01, *** p < .001, . p < .10"
+)
+```
+
+## Theme 3: Demographics
+
+`r committee_note("The committee requested examination of how demographic characteristics relate to study engagement and key EMA outcomes.")`
+
+### Continuous Demographics — Association with Study Engagement
+
+```{r theme3-engagement-cont}
+pred3_cont <- c("age", "bank_balance")
+pred3_cont_labels <- c(
+  age          = "Age",
+  bank_balance = "Bank balance ($)"
+)
+
+cor_table(
+  data           = chars_outcomes,
+  predictors     = pred3_cont,
+  outcomes       = engagement_vars,
+  pred_labels    = pred3_cont_labels,
+  outcome_labels = engagement_labels,
+  caption        = "Theme 3: Continuous demographics — associations with study engagement. * p < .05, ** p < .01, *** p < .001, . p < .10"
+)
+```
+
+### Continuous Demographics — Association with Key EMA Outcomes
+
+```{r theme3-outcomes-cont}
+cor_table(
+  data           = chars_outcomes,
+  predictors     = pred3_cont,
+  outcomes       = outcome_vars,
+  pred_labels    = pred3_cont_labels,
+  outcome_labels = outcome_labels,
+  caption        = "Theme 3: Continuous demographics — associations with key EMA outcomes. * p < .05, ** p < .01, *** p < .001, . p < .10"
+)
+```
+
+### Gender — Group Means by Study Engagement and EMA Outcomes
+
+```{r theme3-gender}
+chars_outcomes %>%
+  filter(!is.na(gender)) %>%
+  group_by(gender) %>%
+  summarise(
+    n                = n(),
+    mean_compliance  = round(mean(compliance, na.rm = TRUE), 2),
+    mean_n_valid     = round(mean(n_valid, na.rm = TRUE), 1),
+    pct_attrition    = round(mean(attrition, na.rm = TRUE) * 100, 1),
+    mean_craving     = round(mean(mean_craving, na.rm = TRUE), 2),
+    mean_mood        = round(mean(mean_mood, na.rm = TRUE), 2),
+    mean_pleasant    = round(mean(mean_pleasant, na.rm = TRUE), 2),
+    mean_unpleasant  = round(mean(mean_unpleasant, na.rm = TRUE), 2),
+    mean_prior_mood  = round(mean(mean_prior_mood, na.rm = TRUE), 2),
+    .groups = "drop"
+  ) %>%
+  rename(
+    Gender              = gender,
+    N                   = n,
+    `Mean Compliance`   = mean_compliance,
+    `Mean N Valid`      = mean_n_valid,
+    `% Attrition`       = pct_attrition,
+    `Mean Craving`      = mean_craving,
+    `Mean Mood`         = mean_mood,
+    `Mean Pleasant`     = mean_pleasant,
+    `Mean Unpleasant`   = mean_unpleasant,
+    `Mean Prior Mood`   = mean_prior_mood
+  ) %>%
+  kable(caption = "Theme 3: Gender — group means for study engagement and key EMA outcomes") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = FALSE) %>%
+  scroll_box(width = "100%")
+```
+
+### Income — Group Means by Study Engagement and EMA Outcomes
+
+```{r theme3-income}
+chars_outcomes %>%
+  filter(!is.na(total_household_income)) %>%
+  mutate(income = as.character(total_household_income)) %>%
+  group_by(income) %>%
+  summarise(
+    n                = n(),
+    mean_compliance  = round(mean(compliance, na.rm = TRUE), 2),
+    pct_attrition    = round(mean(attrition, na.rm = TRUE) * 100, 1),
+    mean_craving     = round(mean(mean_craving, na.rm = TRUE), 2),
+    mean_mood        = round(mean(mean_mood, na.rm = TRUE), 2),
+    .groups = "drop"
+  ) %>%
+  arrange(income) %>%
+  rename(
+    `Household Income`  = income,
+    N                   = n,
+    `Mean Compliance`   = mean_compliance,
+    `% Attrition`       = pct_attrition,
+    `Mean Craving`      = mean_craving,
+    `Mean Mood`         = mean_mood
+  ) %>%
+  kable(caption = "Theme 3: Household income — group means for study engagement and key EMA outcomes. All income categories shown.") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = FALSE)
+```
+
+`r section_summary("Associations between baseline participant characteristics and study engagement and EMA outcomes are examined across three thematic groupings: substance use history and developmental factors, trait affect and reward sensitivity, and demographics. Results are descriptive and intended to inform covariate selection, interpretation of individual differences, and potential confounds in the main analyses.")`
 
 ---
 
