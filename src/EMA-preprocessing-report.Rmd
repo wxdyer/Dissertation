@@ -620,6 +620,7 @@ if(time_var %in% names(study_sample)) {
 cat("## Variables :", paste(names(study_sample), collapse = ", "), "\n")
 ```
 
+
 # Flag (in)valid observations
 
 We use logical tests to define which observations are valid so that we can compare the total N of valid observations between the two datasets. The 'valid' observations are the ones where there are no missing values in the variables of interest (i.e., 'mood', 'before_survey', 'smoke'), and two others that branch off of the variable 'before_survey' ('pleasant', 'unpleasant') . Below we create a validity function that can be used to filter data later.
@@ -845,6 +846,7 @@ study_sample %>%
   summarise(n_q80_values = n_distinct(q80)) %>% # Q80: Cannabis use frequency (past 30 days)
   filter(n_q80_values > 1)
 ```
+Note: Participant 416 is missing all baseline variables due to absence from the baseline questionnaire files. This is participant-level missingness and is noted — their EMA observations are retained in the dataset but baseline covariates will be unavailable for this participant in analyses requiring them.
 
 `r endbutton()` 
 
