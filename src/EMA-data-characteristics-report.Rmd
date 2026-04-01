@@ -192,46 +192,49 @@ glimpse(study_sample)
 ```{r variable-table}
 # Summary table of key variables
 var_info <- tibble::tribble(
-  ~Variable,                  ~Type,          ~Role,                        ~Range_or_Values,
-  "participant_id",           "Numeric",       "Identifier",                 "Unique per participant",
-  "session_id",               "Numeric",       "Identifier",                 "Unique per beep",
-  "study_part",               "Numeric",       "Study design",               "2 = baseline, 6 = incentive",
-  "init_time",                "POSIXct",       "Timestamp",                  "Datetime",
-  "completion_time",          "POSIXct",       "Timestamp",                  "Datetime",
-  "obsno",                    "Numeric",       "Time variable",              "1-60",
-  "dayno",                    "Numeric",       "Time variable",              "1-10",
-  "beepno",                   "Numeric",       "Time variable",              "1-6",
-  "duration",                 "Numeric",       "Time-invariant",             "Days of participation",
-  "mood",                     "Numeric",       "EMA outcome",                "1-100",
-  "smoke",                    "Numeric",       "EMA outcome",                "1-100",
-  "before_survey",            "Categorical",   "EMA branching item",         "Pleasant/Unpleasant/Neutral",
-  "pleasant",                 "Numeric",       "EMA outcome (branch)",       "1-100",
-  "unpleasant",               "Numeric",       "EMA outcome (branch)",       "1-100",
-  "prior_mood",               "Numeric",       "EMA outcome",                "1-100",
-  "smoked_since_last_survey", "Numeric",       "EMA smoking behavior",       "0-6",
-  "age",                      "Numeric",       "Baseline covariate",         "Years",
-  "gender",                   "Categorical",   "Baseline covariate",         "Categorical",
-  "race",                     "Categorical",   "Baseline covariate",         "Categorical",
-  "total_household_income",   "Numeric",       "Baseline covariate",         "Dollars per year",
-  "bank_balance",             "Numeric",       "Baseline covariate",         "Dollars",
-  "ftnd_sum",                 "Numeric",       "Baseline covariate",         "0-10",
-  "cigsperday",               "Numeric",       "Baseline covariate",         "Cigarettes smoked per day",
-  "shaps_sim_sum",            "Numeric",       "Baseline covariate",         "0-14",
-  "panas_pos",                "Numeric",       "Baseline covariate",         "10-50",
-  "panas_neg",                "Numeric",       "Baseline covariate",         "10-50",
-  "co_level",                 "Numeric",       "Biochemical verification",   "parts per million",
-  "co_date",                  "Date",          "Biochemical verification",   "Date",
-  "co_state_smoked",          "Logical",       "Biochemical verification",   "TRUE/FALSE",
-  "co_correct_procedure",     "Logical",       "Biochemical verification",   "TRUE/FALSE",
-  "q23",                      "Numeric",       "Baseline covariate",         "Years",
-  "q24",                      "Numeric",       "Baseline covariate",         "Years",
-  "q25",                      "Numeric",       "Baseline covariate",         "Years",
-  "q71",                      "Numeric",       "Baseline covariate",         "Times in past 30 days",
-  "q80",                      "Numeric",       "Baseline covariate",         "Times in past 30 days"
+  ~Variable,                  ~Type,          ~Description,                                                                              ~Range_or_Values,
+  "participant_id",           "Numeric",       "Identifier",                                                                              "Unique per participant",
+  "session_id",               "Numeric",       "Identifier",                                                                              "Unique per beep",
+  "study_part",               "Numeric",       "Part 2 vs. Part 6",                                                                       "2 = baseline, 6 = incentive",
+  "init_time",                "POSIXct",       "Time beep was opened",                                                                    "Datetime",
+  "completion_time",          "POSIXct",       "Time beep was completed",                                                                 "Datetime",
+  "obsno",                    "Numeric",       "Beep number across study",                                                                "1-60",
+  "dayno",                    "Numeric",       "Day number",                                                                              "1-10",
+  "beepno",                   "Numeric",       "Beep number within day",                                                                  "1-6",
+  "duration",                 "Numeric",       "Days of participation",                                                                   "1-10",
+  "mood",                     "Numeric",       "How would you rate your OVERALL MOOD right now?",                                         "0-100 (0=Extremely negative, 100=Extremely positive)",
+  "smoke",                    "Numeric",       "How much do you have the URGE TO SMOKE right now?",                                       "0-100 (0=No urge at all, 100=Strongest urge ever felt)",
+  "before_survey",            "Categorical",   "Think about what was occurring when you were beeped. Overall, which of the following best describes what you were doing at the time?", "Pleasant / Unpleasant / Neutral",
+  "pleasant",                 "Numeric",       "You indicated that what you were doing when you were beeped was generally pleasant. How pleasant was it?", "0-100 (0=Very slightly, 100=Extremely)",
+  "unpleasant",               "Numeric",       "You indicated that what you were doing when you were beeped was generally unpleasant. How unpleasant was it?", "0-100 (0=Very slightly, 100=Extremely)",
+  "prior_mood",               "Numeric",       "To what degree do you think your mood right now is due to what you were doing just prior to the survey?", "0-100 (0=Not at all, 100=Extremely)",
+  "smoked_since_last_survey", "Numeric",       "Cigarettes smoked since last survey",                                                    "0-6",
+  "age",                      "Numeric",       "Participant age",                                                                         "Years",
+  "gender",                   "Categorical",   "Participant gender",                                                                      "1=Male, 2=Female",
+  "race",                     "Categorical",   "Participant race/ethnicity",                                                              "Categorical (7 levels)",
+  "total_household_income",   "Numeric",       "Total household income",                                                                  "Ordinal/categorical",
+  "bank_balance",             "Numeric",       "Bank balance at baseline",                                                                "Continuous",
+  "ftnd_sum",                 "Numeric",       "Cigarette dependence (FTND)",                                                             "0-10",
+  "cigsperday",               "Numeric",       "Cigarettes smoked per day at baseline",                                                   "0-50",
+  "shaps_sim_sum",            "Numeric",       "Trait anhedonia (SHAPS)",                                                                 "0-14",
+  "panas_pos",                "Numeric",       "Trait positive affect (PANAS)",                                                           "10-50",
+  "panas_neg",                "Numeric",       "Trait negative affect (PANAS)",                                                           "10-50",
+  "co_level",                 "Numeric",       "Carbon monoxide (CO) level",                                                              "ppm",
+  "co_date",                  "Date",          "Date of CO measurement",                                                                  "Date",
+  "co_state_smoked",          "Logical",       "Verbal indication of smoking abstinence",                                                 "TRUE/FALSE",
+  "co_correct_procedure",     "Logical",       "CO procedure completed correctly",                                                        "TRUE/FALSE",
+  "q23",                      "Numeric",       "Age at first puff",                                                                       "Years",
+  "q24",                      "Numeric",       "Age at first full cigarette",                                                             "Years",
+  "q25",                      "Numeric",       "Age at regular smoking onset",                                                            "Years",
+  "q71",                      "Numeric",       "E-cigarette use frequency (past 30 days)",                                                "Times",
+  "q80",                      "Numeric",       "Cannabis use frequency (past 30 days)",                                                   "Times"
 )
 
 kable(var_info, caption = "Variable descriptions for the preprocessed DVAL EMA dataset") %>%
-  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = TRUE) %>%
+  column_spec(3, width = "35em") %>%
+  column_spec(4, width = "20em")
 ```
 
 `r endbutton()`
@@ -266,7 +269,7 @@ cont_vars <- tibble::tribble(
   "SHAPS score",                      "shaps_sim_sum",
   "PANAS positive affect",            "panas_pos",
   "PANAS negative affect",            "panas_neg",
-  "Bank balance ($)",                 "bank_balance",
+  "Bank balance",                      "bank_balance",
   "Age at first puff",                "q23",
   "Age at first full cigarette",      "q24",
   "Age at regular smoking onset",     "q25",
@@ -324,16 +327,30 @@ baseline_chars %>%
   kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
                 full_width = FALSE)
 
-# --- Table 4: Household income ---
+# --- Figure: Household income histogram ---
 baseline_chars %>%
-  mutate(total_household_income = as.character(total_household_income)) %>%
-  count(total_household_income) %>%
-  mutate(pct = round(n / sum(n) * 100, 1)) %>%
-  arrange(total_household_income) %>%
-  rename(`Household Income` = total_household_income, N = n, `%` = pct) %>%
-  kable(caption = "Household income — all categories shown") %>%
-  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
-                full_width = FALSE)
+  filter(!is.na(total_household_income)) %>%
+  mutate(income_bin = case_when(
+    total_household_income < 20000                              ~ "< $20k",
+    total_household_income >= 20000 & total_household_income < 40000  ~ "$20k–$39k",
+    total_household_income >= 40000 & total_household_income < 60000  ~ "$40k–$59k",
+    total_household_income >= 60000 & total_household_income < 80000  ~ "$60k–$79k",
+    total_household_income >= 80000 & total_household_income < 100000 ~ "$80k–$99k",
+    total_household_income >= 100000                            ~ "$100k+",
+    TRUE ~ "Unknown"
+  )) %>%
+  mutate(income_bin = factor(income_bin,
+                              levels = c("< $20k", "$20k–$39k", "$40k–$59k",
+                                         "$60k–$79k", "$80k–$99k", "$100k+"))) %>%
+  ggplot(aes(x = income_bin)) +
+  geom_bar(fill = "steelblue", color = "white") +
+  labs(
+    title = "Household income distribution",
+    x     = "Annual household income",
+    y     = "Number of participants"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1))
 ```
 
 `r endbutton()`
@@ -1004,10 +1021,11 @@ study_sample %>%
 ```
 
 ```{r temporal-dayno}
-# Means by study day
+# Means by study day — Part 6 completers only
+# (change over all 10 days is only meaningful for participants with Part 6 data)
 study_sample %>%
   mutate(valid = check_validity(.)) %>%
-  filter(valid == 1) %>%
+  filter(valid == 1, participant_id %in% valid_completers) %>%
   select(dayno, all_of(c("mood", "smoke", "pleasant", "unpleasant", "prior_mood"))) %>%
   pivot_longer(-dayno, names_to = "variable", values_to = "value") %>%
   filter(!is.na(value)) %>%
@@ -1021,9 +1039,10 @@ study_sample %>%
            size = 3, color = "gray40") +
   annotate("text", x = 7, y = Inf, label = "Part 6", vjust = 1.5,
            size = 3, color = "gray40") +
+  scale_x_continuous(breaks = 1:10) +
   facet_wrap(~ variable, scales = "free_y") +
   labs(
-    title = "Mean EMA variable values by study day",
+    title = "Mean EMA variable values by study day (Part 6 completers only)",
     x     = "Study day",
     y     = "Mean value"
   ) +
@@ -1053,7 +1072,498 @@ study_sample %>%
                 full_width = FALSE)
 ```
 
-`r section_summary("Distributions of key EMA variables (mood, craving, pleasant, unpleasant, prior mood) are described above. ICCs from null models indicate the proportion of variance attributable to stable between-person differences versus moment-to-moment within-person fluctuation — results inform whether multilevel modeling is warranted and how predictors should be centered. Temporal patterns by beep number and study day are examined to identify potential time-of-day and study-phase effects. Condition-level means show how mood and craving differ across pleasant, unpleasant, and neutral event appraisal contexts, providing a preliminary look at the central contrasts for Aims 1 and 2.")`
+`r section_summary("Distributions of key EMA variables (mood, craving, pleasant, unpleasant, prior mood) are described above. ICCs from null models indicate the proportion of variance attributable to stable between-person differences versus moment-to-moment within-person fluctuation — results inform whether multilevel modeling is warranted and how predictors should be centered. Temporal patterns by beep number and study day (Part 6 completers only) are examined to identify potential time-of-day and study-phase effects. Condition-level means show how mood and craving differ across pleasant, unpleasant, and neutral event appraisal contexts, providing a preliminary look at the central contrasts for Aims 1 and 2.")`
+
+## Weekday vs. Weekend Effects
+
+*Following Siepe et al. (2024), we examine whether key EMA outcomes differ between weekdays and weekends.*
+
+```{r weekday-weekend}
+study_sample %>%
+  mutate(valid = check_validity(.)) %>%
+  filter(valid == 1) %>%
+  mutate(
+    day_type  = ifelse(wday(completion_time, week_start = 1) %in% c(6, 7),
+                       "Weekend", "Weekday"),
+    variable  = "mood"
+  ) %>%
+  select(participant_id, day_type,
+         mood, smoke, pleasant, unpleasant, prior_mood) %>%
+  pivot_longer(cols = c(mood, smoke, pleasant, unpleasant, prior_mood),
+               names_to = "variable", values_to = "value") %>%
+  filter(!is.na(value)) %>%
+  group_by(day_type, variable) %>%
+  summarise(
+    n    = n(),
+    Mean = round(mean(value, na.rm = TRUE), 2),
+    SD   = round(sd(value, na.rm = TRUE), 2),
+    .groups = "drop"
+  ) %>%
+  mutate(variable = recode(variable,
+    mood      = "Mood",
+    smoke     = "Craving",
+    pleasant  = "Pleasant rating",
+    unpleasant = "Unpleasant rating",
+    prior_mood = "Prior mood"
+  )) %>%
+  pivot_wider(names_from = day_type,
+              values_from = c(n, Mean, SD),
+              names_glue = "{day_type}_{.value}") %>%
+  select(variable,
+         Weekday_n, Weekday_Mean, Weekday_SD,
+         Weekend_n, Weekend_Mean, Weekend_SD) %>%
+  kable(caption = "Key EMA outcomes by day type (weekday vs. weekend)") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = FALSE)
+```
+
+## EMA Outcomes and Concurrent Smoking
+
+*Pearson correlations between all key EMA outcomes at the beep level (valid observations only). This characterizes how these momentary constructs co-occur across the study.*
+
+```{r ema-smoking-cors}
+ema_smoking_cors <- study_sample %>%
+  mutate(valid = check_validity(.)) %>%
+  filter(valid == 1) %>%
+  select(smoke, mood, pleasant, unpleasant, prior_mood,
+         smoked_since_last_survey)
+
+# Rename for display
+cor_display_vars <- c(
+  smoke                   = "Craving",
+  mood                    = "Mood",
+  pleasant                = "Pleasant rating",
+  unpleasant              = "Unpleasant rating",
+  prior_mood              = "Prior mood",
+  smoked_since_last_survey = "Cigarettes since\nlast survey"
+)
+
+# Build full correlation matrix with significance stars
+sig_stars_fn <- function(p) {
+  if (is.na(p)) return("")
+  if (p < .001) return("***")
+  if (p < .01)  return("**")
+  if (p < .05)  return("*")
+  if (p < .10)  return(".")
+  return("")
+}
+
+var_names <- names(cor_display_vars)
+n_v <- length(var_names)
+mat <- matrix("—", nrow = n_v, ncol = n_v,
+              dimnames = list(unname(cor_display_vars),
+                              unname(cor_display_vars)))
+
+for (i in seq_len(n_v)) {
+  for (j in seq_len(n_v)) {
+    if (i != j) {
+      result <- tryCatch({
+        test <- cor.test(ema_smoking_cors[[var_names[i]]],
+                         ema_smoking_cors[[var_names[j]]],
+                         use = "pairwise.complete.obs")
+        paste0(round(test$estimate, 2), sig_stars_fn(test$p.value))
+      }, error = function(e) "—")
+      mat[i, j] <- result
+    }
+  }
+}
+
+as.data.frame(mat) %>%
+  kable(caption = "Beep-level correlations among key EMA outcomes and concurrent smoking behavior. Correlations are computed across all valid observations. * p < .05, ** p < .01, *** p < .001, . p < .10") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = FALSE)
+```
+
+## EMA Outcomes Across Days of Abstinence (Part 6 Completers)
+
+*Following Siepe et al. (2024), this section examines key EMA outcomes as a function of consecutive days without smoking during Part 6. The sample shrinks as participants resume smoking — n at each abstinence day is reported. This analysis covers up to 7 days of abstinence and is restricted to Part 6 completers.*
+
+```{r abstinence-days}
+# For each Part 6 completer, identify consecutive abstinence days
+# A participant is "abstinent on day X" if smoked_since_last_survey == 0
+# for all valid beeps on that day
+
+# Daily smoking indicator per participant per Part 6 day
+daily_abstinence <- study_sample %>%
+  mutate(valid = check_validity(.)) %>%
+  filter(valid == 1, study_part == 6,
+         participant_id %in% valid_completers,
+         !is.na(smoked_since_last_survey)) %>%
+  group_by(participant_id, dayno) %>%
+  summarise(
+    any_smoking = any(smoked_since_last_survey > 0, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  arrange(participant_id, dayno) %>%
+  group_by(participant_id) %>%
+  mutate(
+    # Consecutive abstinence day: reset counter on any smoking day
+    abstinence_streak = {
+      streak <- integer(n())
+      count  <- 0L
+      for (k in seq_len(n())) {
+        if (!any_smoking[k]) {
+          count <- count + 1L
+        } else {
+          count <- 0L
+        }
+        streak[k] <- count
+      }
+      streak
+    }
+  ) %>%
+  ungroup()
+
+# EMA outcomes on each abstinence streak day
+abstinence_ema <- study_sample %>%
+  mutate(valid = check_validity(.)) %>%
+  filter(valid == 1, study_part == 6,
+         participant_id %in% valid_completers) %>%
+  left_join(daily_abstinence %>%
+              select(participant_id, dayno, abstinence_streak),
+            by = c("participant_id", "dayno")) %>%
+  filter(abstinence_streak >= 1, abstinence_streak <= 7)
+
+# Summary table by abstinence day
+abstinence_ema %>%
+  group_by(abstinence_streak) %>%
+  summarise(
+    n_obs          = n(),
+    n_participants = n_distinct(participant_id),
+    mean_craving   = round(mean(smoke, na.rm = TRUE), 2),
+    sd_craving     = round(sd(smoke, na.rm = TRUE), 2),
+    mean_mood      = round(mean(mood, na.rm = TRUE), 2),
+    sd_mood        = round(sd(mood, na.rm = TRUE), 2),
+    mean_pleasant  = round(mean(pleasant, na.rm = TRUE), 2),
+    sd_pleasant    = round(sd(pleasant, na.rm = TRUE), 2),
+    mean_unpleasant = round(mean(unpleasant, na.rm = TRUE), 2),
+    sd_unpleasant  = round(sd(unpleasant, na.rm = TRUE), 2),
+    .groups = "drop"
+  ) %>%
+  rename(`Abstinence Day` = abstinence_streak,
+         `N Obs`          = n_obs,
+         `N Participants` = n_participants,
+         `Craving M`      = mean_craving,
+         `Craving SD`     = sd_craving,
+         `Mood M`         = mean_mood,
+         `Mood SD`        = sd_mood,
+         `Pleasant M`     = mean_pleasant,
+         `Pleasant SD`    = sd_pleasant,
+         `Unpleasant M`   = mean_unpleasant,
+         `Unpleasant SD`  = sd_unpleasant) %>%
+  kable(caption = "Key EMA outcomes by consecutive abstinence day during Part 6 (Part 6 completers only). N participants reflects the shrinking cohort remaining abstinent at each day.") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = FALSE)
+
+# Plot: craving and mood by abstinence day
+abstinence_ema %>%
+  group_by(abstinence_streak) %>%
+  summarise(
+    mean_craving = mean(smoke, na.rm = TRUE),
+    se_craving   = sd(smoke, na.rm = TRUE) / sqrt(n()),
+    mean_mood    = mean(mood, na.rm = TRUE),
+    se_mood      = sd(mood, na.rm = TRUE) / sqrt(n()),
+    .groups = "drop"
+  ) %>%
+  pivot_longer(cols = c(mean_craving, mean_mood),
+               names_to = "outcome", values_to = "mean") %>%
+  mutate(
+    se = ifelse(outcome == "mean_craving", se_craving, se_mood),
+    outcome = recode(outcome,
+                     mean_craving = "Craving",
+                     mean_mood    = "Mood")
+  ) %>%
+  ggplot(aes(x = abstinence_streak, y = mean, color = outcome, group = outcome)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2) +
+  geom_errorbar(aes(ymin = mean - se, ymax = mean + se),
+                width = 0.2, alpha = 0.6) +
+  scale_x_continuous(breaks = 1:7) +
+  labs(
+    title    = "Craving and mood across consecutive abstinence days (Part 6)",
+    subtitle = "Error bars = SE",
+    x        = "Consecutive abstinence day",
+    y        = "Mean value",
+    color    = "Outcome"
+  ) +
+  theme_minimal()
+```
+
+## Lag and Cross-Lag Associations (Inertia)
+
+*Following Siepe et al. (2024), this section examines temporal inertia (autocorrelation) and cross-lagged associations between key EMA variables. Lag-1 correlations are computed at the person level and averaged across participants. These results provide a preliminary picture of temporal dependency in the data and inform decisions about autoregressive model components.*
+
+```{r lag-analysis}
+# Compute lag-1 values within person within day
+lag_data <- study_sample %>%
+  mutate(valid = check_validity(.)) %>%
+  filter(valid == 1) %>%
+  arrange(participant_id, obsno) %>%
+  group_by(participant_id) %>%
+  mutate(
+    lag_mood      = lag(mood),
+    lag_smoke     = lag(smoke),
+    lag_pleasant  = lag(pleasant),
+    lag_unpleasant = lag(unpleasant),
+    lag_prior_mood = lag(prior_mood)
+  ) %>%
+  ungroup()
+
+# Person-level lag-1 autocorrelations
+lag_cors <- lag_data %>%
+  filter(!is.na(lag_mood)) %>%
+  group_by(participant_id) %>%
+  summarise(
+    r_mood        = cor(mood, lag_mood, use = "pairwise.complete.obs"),
+    r_smoke       = cor(smoke, lag_smoke, use = "pairwise.complete.obs"),
+    r_pleasant    = cor(pleasant, lag_pleasant, use = "pairwise.complete.obs"),
+    r_unpleasant  = cor(unpleasant, lag_unpleasant, use = "pairwise.complete.obs"),
+    r_prior_mood  = cor(prior_mood, lag_prior_mood, use = "pairwise.complete.obs"),
+    .groups = "drop"
+  )
+
+# Average across participants
+lag_cors %>%
+  summarise(across(starts_with("r_"),
+                   list(mean = ~ round(mean(.x, na.rm = TRUE), 3),
+                        sd   = ~ round(sd(.x, na.rm = TRUE), 3)),
+                   .names = "{.col}_{.fn}")) %>%
+  pivot_longer(everything(),
+               names_to  = c("Variable", "Stat"),
+               names_pattern = "r_(.+)_(mean|sd)") %>%
+  pivot_wider(names_from = Stat, values_from = value) %>%
+  mutate(Variable = recode(Variable,
+    mood       = "Mood",
+    smoke      = "Craving",
+    pleasant   = "Pleasant rating",
+    unpleasant = "Unpleasant rating",
+    prior_mood = "Prior mood"
+  )) %>%
+  rename(`Mean lag-1 r` = mean, `SD` = sd) %>%
+  kable(caption = "Person-level lag-1 autocorrelations for key EMA variables (mean and SD across participants). Higher values indicate greater inertia — less moment-to-moment variability relative to prior state.") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = FALSE)
+
+# Cross-lag: craving predicting mood, mood predicting craving
+cross_lag <- lag_data %>%
+  filter(!is.na(lag_smoke), !is.na(lag_mood)) %>%
+  group_by(participant_id) %>%
+  summarise(
+    r_smoke_to_mood  = cor(mood,  lag_smoke, use = "pairwise.complete.obs"),
+    r_mood_to_smoke  = cor(smoke, lag_mood,  use = "pairwise.complete.obs"),
+    r_pleasant_to_smoke = cor(smoke, lag_pleasant, use = "pairwise.complete.obs"),
+    r_unpleasant_to_smoke = cor(smoke, lag_unpleasant, use = "pairwise.complete.obs"),
+    .groups = "drop"
+  )
+
+cross_lag %>%
+  summarise(across(everything(),
+                   list(mean = ~ round(mean(.x, na.rm = TRUE), 3),
+                        sd   = ~ round(sd(.x, na.rm = TRUE), 3)),
+                   .names = "{.col}_{.fn}")) %>%
+  pivot_longer(everything(),
+               names_to  = c("Association", "Stat"),
+               names_pattern = "(.+)_(mean|sd)") %>%
+  pivot_wider(names_from = Stat, values_from = value) %>%
+  mutate(Association = recode(Association,
+    r_smoke_to_mood       = "Lag-1 craving → mood",
+    r_mood_to_smoke       = "Lag-1 mood → craving",
+    r_pleasant_to_smoke   = "Lag-1 pleasant rating → craving",
+    r_unpleasant_to_smoke = "Lag-1 unpleasant rating → craving"
+  )) %>%
+  rename(`Mean cross-lag r` = mean, `SD` = sd) %>%
+  kable(caption = "Person-level cross-lag correlations between key EMA variables (mean and SD across participants). These provide a preliminary look at temporal precedence relationships relevant to Aims 1–3.") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = FALSE)
+```
+
+---
+
+# Change over Time
+
+<!-- This section examines potentially meaningful change over time in craving, reward processing,
+     and cigarette use among Part 6 completers. Analyses here are descriptive and designed to
+     inform the feasibility and scope of Aim 3 analyses prior to formal modeling. -->
+
+*This section examines craving, reward processing, and cigarette use trajectories among Part 6 completers across the 10-day study period. Results are intended to characterize potentially meaningful change over time and assess the feasibility of Aim 3 analyses.*
+
+`r committee_note("This section is intended to assess whether the data support the proposed Aim 3 analyses, including the feasibility of regression-based analyses across change categories (Quitter, Reducer, Stable, Increaser).")`
+
+```{r aim3-feasibility}
+# Ensure person_class and part6_deviation are available
+# (recompute here for independence from earlier chunks)
+
+# Smoking completers with daily totals
+smoking_completers_aim3 <- study_sample %>%
+  mutate(valid = check_validity(.)) %>%
+  filter(valid == 1,
+         participant_id %in% valid_completers,
+         !is.na(smoked_since_last_survey),
+         !is.na(dayno)) %>%
+  group_by(participant_id, dayno) %>%
+  summarise(
+    daily_smoked    = sum(smoked_since_last_survey, na.rm = TRUE),
+    mean_craving    = mean(smoke, na.rm = TRUE),
+    mean_mood       = mean(mood, na.rm = TRUE),
+    mean_pleasant   = mean(pleasant, na.rm = TRUE),
+    reward_processing = mean(pleasant * mood / 100, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(part = ifelse(dayno <= 3, "Part 2 (Baseline)", "Part 6 (Incentive)"))
+
+# Baseline means per person
+baseline_aim3 <- smoking_completers_aim3 %>%
+  filter(dayno <= 3) %>%
+  group_by(participant_id) %>%
+  summarise(
+    baseline_smoked           = mean(daily_smoked, na.rm = TRUE),
+    baseline_craving          = mean(mean_craving, na.rm = TRUE),
+    baseline_reward           = mean(reward_processing, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Part 6 means per person
+part6_aim3 <- smoking_completers_aim3 %>%
+  filter(dayno > 3) %>%
+  group_by(participant_id) %>%
+  summarise(
+    part6_smoked   = mean(daily_smoked, na.rm = TRUE),
+    part6_craving  = mean(mean_craving, na.rm = TRUE),
+    part6_reward   = mean(reward_processing, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Merge and classify
+aim3_data <- baseline_aim3 %>%
+  left_join(part6_aim3, by = "participant_id") %>%
+  mutate(
+    change_cat = case_when(
+      part6_smoked <= 0.1                            ~ "Quitter",
+      part6_smoked < baseline_smoked * 0.80          ~ "Reducer",
+      part6_smoked > baseline_smoked * 1.20          ~ "Increaser",
+      TRUE                                            ~ "Stable"
+    ),
+    delta_craving = part6_craving - baseline_craving,
+    delta_reward  = part6_reward  - baseline_reward,
+    delta_smoked  = part6_smoked  - baseline_smoked
+  )
+
+# --- Table: Group sizes and feasibility check ---
+aim3_data %>%
+  count(change_cat) %>%
+  mutate(pct = round(n / sum(n) * 100, 1)) %>%
+  rename(`Change Category` = change_cat, N = n, `%` = pct) %>%
+  kable(caption = "Sample size by change category — feasibility check for Aim 3 regression analyses") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = FALSE)
+
+# --- Table: Mean changes in craving and reward by category ---
+aim3_data %>%
+  group_by(change_cat) %>%
+  summarise(
+    n                    = n(),
+    mean_delta_craving   = round(mean(delta_craving, na.rm = TRUE), 2),
+    sd_delta_craving     = round(sd(delta_craving, na.rm = TRUE), 2),
+    mean_delta_reward    = round(mean(delta_reward, na.rm = TRUE), 2),
+    sd_delta_reward      = round(sd(delta_reward, na.rm = TRUE), 2),
+    mean_delta_smoked    = round(mean(delta_smoked, na.rm = TRUE), 2),
+    sd_delta_smoked      = round(sd(delta_smoked, na.rm = TRUE), 2),
+    .groups = "drop"
+  ) %>%
+  rename(
+    `Change Category`      = change_cat,
+    N                      = n,
+    `Δ Craving M`          = mean_delta_craving,
+    `Δ Craving SD`         = sd_delta_craving,
+    `Δ Reward M`           = mean_delta_reward,
+    `Δ Reward SD`          = sd_delta_reward,
+    `Δ Smoking M`          = mean_delta_smoked,
+    `Δ Smoking SD`         = sd_delta_smoked
+  ) %>%
+  kable(caption = "Mean changes (Part 6 minus Part 2 baseline) in craving, reward processing, and smoking by change category. Δ = Part 6 mean minus Part 2 mean.") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = FALSE)
+```
+
+```{r aim3-spaghetti}
+# Build daily data with change category for spaghetti plot
+daily_aim3 <- smoking_completers_aim3 %>%
+  left_join(aim3_data %>% select(participant_id, change_cat),
+            by = "participant_id") %>%
+  filter(!is.na(change_cat))
+
+# Group means per day per category
+group_means_aim3 <- daily_aim3 %>%
+  group_by(dayno, change_cat) %>%
+  summarise(
+    group_craving = mean(mean_craving, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Spaghetti plot: individual craving trajectories + group mean by change category
+ggplot(daily_aim3, aes(x = dayno, y = mean_craving)) +
+  geom_line(aes(group = participant_id), alpha = 0.2, color = "gray60") +
+  geom_line(data = group_means_aim3,
+            aes(y = group_craving, color = change_cat),
+            linewidth = 1.5) +
+  geom_vline(xintercept = 3.5, linetype = "dashed", color = "gray40") +
+  scale_color_manual(
+    values = c(
+      "Quitter"   = "darkgreen",
+      "Reducer"   = "steelblue",
+      "Stable"    = "gray40",
+      "Increaser" = "tomato"
+    )
+  ) +
+  scale_x_continuous(breaks = 1:10) +
+  annotate("text", x = 2, y = Inf, label = "Part 2\n(Baseline)",
+           vjust = 1.5, size = 3, color = "gray40") +
+  annotate("text", x = 7, y = Inf, label = "Part 6\n(Incentive)",
+           vjust = 1.5, size = 3, color = "gray40") +
+  labs(
+    title    = "Daily craving trajectories by smoking change category (Part 6 completers)",
+    subtitle = "Light lines = individual trajectories; bold lines = group means by change category",
+    x        = "Study day",
+    y        = "Mean daily craving",
+    color    = "Change category"
+  ) +
+  theme_minimal()
+
+# Same plot for reward processing
+group_means_reward <- daily_aim3 %>%
+  group_by(dayno, change_cat) %>%
+  summarise(group_reward = mean(reward_processing, na.rm = TRUE), .groups = "drop")
+
+ggplot(daily_aim3, aes(x = dayno, y = reward_processing)) +
+  geom_line(aes(group = participant_id), alpha = 0.2, color = "gray60") +
+  geom_line(data = group_means_reward,
+            aes(y = group_reward, color = change_cat),
+            linewidth = 1.5) +
+  geom_vline(xintercept = 3.5, linetype = "dashed", color = "gray40") +
+  scale_color_manual(
+    values = c(
+      "Quitter"   = "darkgreen",
+      "Reducer"   = "steelblue",
+      "Stable"    = "gray40",
+      "Increaser" = "tomato"
+    )
+  ) +
+  scale_x_continuous(breaks = 1:10) +
+  annotate("text", x = 2, y = Inf, label = "Part 2\n(Baseline)",
+           vjust = 1.5, size = 3, color = "gray40") +
+  annotate("text", x = 7, y = Inf, label = "Part 6\n(Incentive)",
+           vjust = 1.5, size = 3, color = "gray40") +
+  labs(
+    title    = "Daily reward processing trajectories by smoking change category (Part 6 completers)",
+    subtitle = "Reward processing = pleasant × mood / 100. Light lines = individual; bold = group mean",
+    x        = "Study day",
+    y        = "Mean daily reward processing index",
+    color    = "Change category"
+  ) +
+  theme_minimal()
+```
+
+`r section_summary("Preliminary descriptive evidence for Aim 3 is presented above. Craving and reward processing trajectories are plotted by smoking change category across the full 10-day study period. Group sizes by change category are reported to assess whether regression-based analyses are feasible. Mean changes in craving, reward processing, and smoking from Part 2 baseline to Part 6 are summarized by category. These results will inform the analytic approach and scope of Aim 3.")`
 
 ---
 
@@ -1208,12 +1718,14 @@ ggplot(part6_deviation, aes(x = dayno, y = deviation,
 `r committee_note("The committee requested that 3-day EMA cigarette smoking data be used to calculate each participant's typical smoking behavior as a baseline metric for assessing relative deviations during Part 6.")`
 
 ```{r baseline-smoking}
-# --- Table 1: Part 2 vs Part 6 smoking summary for completers ---
+# --- Table 1: Smoking summary across three samples ---
 
-# Part 2 summary — all participants
-part2_all <- study_sample %>%
+# Part 2 non-completers (Part 2 only, did not continue to Part 6)
+part2_noncompleters <- study_sample %>%
   mutate(valid = check_validity(.)) %>%
-  filter(valid == 1, study_part == 2, !is.na(smoked_since_last_survey)) %>%
+  filter(valid == 1, study_part == 2,
+         !is.na(smoked_since_last_survey),
+         !participant_id %in% part6_completers) %>%
   group_by(participant_id) %>%
   summarise(
     baseline_total = sum(smoked_since_last_survey, na.rm = TRUE),
@@ -1222,9 +1734,19 @@ part2_all <- study_sample %>%
     .groups = "drop"
   )
 
-# Part 2 summary — completers only
-part2_completers <- part2_all %>%
-  filter(participant_id %in% part6_completers)
+# Part 2 summary — Part 6 completers only
+part2_completers <- study_sample %>%
+  mutate(valid = check_validity(.)) %>%
+  filter(valid == 1, study_part == 2,
+         !is.na(smoked_since_last_survey),
+         participant_id %in% part6_completers) %>%
+  group_by(participant_id) %>%
+  summarise(
+    baseline_total = sum(smoked_since_last_survey, na.rm = TRUE),
+    baseline_days  = n_distinct(dayno),
+    baseline_daily = round(baseline_total / baseline_days, 2),
+    .groups = "drop"
+  )
 
 # Part 6 summary — completers only
 part6_summary <- study_sample %>%
@@ -1240,34 +1762,24 @@ part6_summary <- study_sample %>%
 
 # Build comparison table
 tibble(
-  Sample = c("Part 2 completers",
-           "Part 6 completers — Part 2 (baseline)",
-           "Part 6 completers — Part 6 (incentive)"),
-N = c(
-  nrow(part2_completers),
-  nrow(part2_completers),
-  nrow(part6_summary)
-),
-Mean_daily = c(
-  round(mean(part2_completers$baseline_daily, na.rm = TRUE), 2),
-  round(mean(part2_completers$baseline_daily, na.rm = TRUE), 2),
-  round(mean(part6_summary$part6_daily, na.rm = TRUE), 2)
-),
-  SD_daily = c(
-    round(sd(part2_completers$baseline_daily, na.rm = TRUE), 2),
-    round(sd(part2_completers$baseline_daily, na.rm = TRUE), 2),
-    round(sd(part6_summary$part6_daily, na.rm = TRUE), 2)
-  ),
-  Min_daily = c(
-    min(part2_completers$baseline_daily, na.rm = TRUE),
-    min(part2_completers$baseline_daily, na.rm = TRUE),
-    min(part6_summary$part6_daily, na.rm = TRUE)
-  ),
-  Max_daily = c(
-    max(part2_completers$baseline_daily, na.rm = TRUE),
-    max(part2_completers$baseline_daily, na.rm = TRUE),
-    max(part6_summary$part6_daily, na.rm = TRUE)
-  )
+  Sample     = c("Part 2 non-completers (Part 2 only)",
+                 "Part 6 completers — Part 2 (baseline)",
+                 "Part 6 completers — Part 6 (incentive)"),
+  N          = c(nrow(part2_noncompleters),
+                 nrow(part2_completers),
+                 nrow(part6_summary)),
+  Mean_daily = c(round(mean(part2_noncompleters$baseline_daily, na.rm = TRUE), 2),
+                 round(mean(part2_completers$baseline_daily, na.rm = TRUE), 2),
+                 round(mean(part6_summary$part6_daily, na.rm = TRUE), 2)),
+  SD_daily   = c(round(sd(part2_noncompleters$baseline_daily, na.rm = TRUE), 2),
+                 round(sd(part2_completers$baseline_daily, na.rm = TRUE), 2),
+                 round(sd(part6_summary$part6_daily, na.rm = TRUE), 2)),
+  Min_daily  = c(min(part2_noncompleters$baseline_daily, na.rm = TRUE),
+                 min(part2_completers$baseline_daily, na.rm = TRUE),
+                 min(part6_summary$part6_daily, na.rm = TRUE)),
+  Max_daily  = c(max(part2_noncompleters$baseline_daily, na.rm = TRUE),
+                 max(part2_completers$baseline_daily, na.rm = TRUE),
+                 max(part6_summary$part6_daily, na.rm = TRUE))
 ) %>%
   kable(caption = "Daily cigarette use summary by sample and study part") %>%
   kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
