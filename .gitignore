@@ -1,27 +1,12 @@
+# Knitr figure output folders
+**/EMA-preprocessing-report_files/
+**/EMA-data-characteristics-report_files/
 
-
-# R session files
+# R session artifacts
 .Rhistory
 .RData
 .Rproj.user/
-.Rproj.user
-Dissertation_Git.Rproj
-.DS_Store
-
-
-# RStudio files
-.Rproj.user/
-*.Rproj
 
 # OS files
 .DS_Store
 Thumbs.db
-
-# PC suffixes 
-*-wpc-*.Rhistory
--wpc*.Rhistory
-*-wpc-*.RData
-wpc-*.RData
-*-wpc*.Rmd
-*-wpc-*.Rmd
-*wpc-*.Rmd
