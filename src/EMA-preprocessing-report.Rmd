@@ -386,6 +386,7 @@ baseline_clean <- baseline %>%
     gender,
     total_household_income,
     bank_balance,
+    employment_status,
     ftnd_sum,
     cigsperday,
     shaps_sim_sum,
@@ -395,6 +396,12 @@ baseline_clean <- baseline %>%
     q80, #past 30-day marijuana use
     q71, #past 30-day e-cig use
   )
+baseline_clean <- baseline_clean %>%
+  mutate(employment_status = recode(as.character(employment_status),
+    "1" = "Part-time",
+    "2" = "Full-time",
+    "3" = "Not currently employed"
+  ))
 ```
 
 `r endbutton()` 
@@ -414,6 +421,7 @@ baseline_vars <- c(
   "gender",
   "total_household_income",
   "bank_balance",
+  "employment_status",
   "ftnd_sum",
   "cigsperday",
   "shaps_sim_sum",
@@ -815,6 +823,11 @@ study_sample %>%
   group_by(participant_id) %>%
   summarise(n_ftnd_sum_values = n_distinct(ftnd_sum)) %>%
   filter(n_ftnd_sum_values > 1)
+
+study_sample %>%
+  group_by(participant_id) %>%
+  summarise(n_employment_values = n_distinct(employment_status)) %>%
+  filter(n_employment_values > 1)
 
 study_sample %>%
   group_by(participant_id) %>%

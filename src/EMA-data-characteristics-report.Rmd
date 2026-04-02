@@ -227,7 +227,8 @@ var_info <- tibble::tribble(
   "q24",                      "Numeric",       "Age at first full cigarette",                                                             "Years",
   "q25",                      "Numeric",       "Age at regular smoking onset",                                                            "Years",
   "q71",                      "Numeric",       "E-cigarette use frequency (past 30 days)",                                                "Times",
-  "q80",                      "Numeric",       "Cannabis use frequency (past 30 days)",                                                   "Times"
+  "q80",                      "Numeric",       "Cannabis use frequency (past 30 days)",                                                   "Times",
+  "employment_status", "Categorical", "Employment status at baseline", "Part-time / Full-time / Not currently employed"
 )
 
 kable(var_info, caption = "Variable descriptions for the preprocessed DVAL EMA dataset") %>%
@@ -351,6 +352,15 @@ baseline_chars %>%
   ) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 30, hjust = 1))
+
+# --- Table 5: Employment status ---
+baseline_chars %>%
+  count(employment_status) %>%
+  mutate(pct = round(n / sum(n) * 100, 1)) %>%
+  rename(`Employment Status` = employment_status, N = n, `%` = pct) %>%
+  kable(caption = "Employment status") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = FALSE)
 ```
 
 `r endbutton()`
@@ -1079,40 +1089,37 @@ study_sample %>%
 *Following Siepe et al. (2024), we examine whether key EMA outcomes differ between weekdays and weekends.*
 
 ```{r weekday-weekend}
+# Weekday vs. weekend by employment status
 study_sample %>%
   mutate(valid = check_validity(.)) %>%
-  filter(valid == 1) %>%
+  filter(valid == 1, !is.na(employment_status)) %>%
   mutate(
-    day_type  = ifelse(wday(completion_time, week_start = 1) %in% c(6, 7),
-                       "Weekend", "Weekday"),
-    variable  = "mood"
+    day_type = ifelse(wday(completion_time, week_start = 1) %in% c(6, 7),
+                      "Weekend", "Weekday")
   ) %>%
-  select(participant_id, day_type,
+  select(participant_id, day_type, employment_status,
          mood, smoke, pleasant, unpleasant, prior_mood) %>%
   pivot_longer(cols = c(mood, smoke, pleasant, unpleasant, prior_mood),
                names_to = "variable", values_to = "value") %>%
   filter(!is.na(value)) %>%
-  group_by(day_type, variable) %>%
+  mutate(variable = recode(variable,
+    mood       = "Mood",
+    smoke      = "Craving",
+    pleasant   = "Pleasant rating",
+    unpleasant = "Unpleasant rating",
+    prior_mood = "Prior mood"
+  )) %>%
+  group_by(employment_status, day_type, variable) %>%
   summarise(
-    n    = n(),
     Mean = round(mean(value, na.rm = TRUE), 2),
     SD   = round(sd(value, na.rm = TRUE), 2),
     .groups = "drop"
   ) %>%
-  mutate(variable = recode(variable,
-    mood      = "Mood",
-    smoke     = "Craving",
-    pleasant  = "Pleasant rating",
-    unpleasant = "Unpleasant rating",
-    prior_mood = "Prior mood"
-  )) %>%
   pivot_wider(names_from = day_type,
-              values_from = c(n, Mean, SD),
+              values_from = c(Mean, SD),
               names_glue = "{day_type}_{.value}") %>%
-  select(variable,
-         Weekday_n, Weekday_Mean, Weekday_SD,
-         Weekend_n, Weekend_Mean, Weekend_SD) %>%
-  kable(caption = "Key EMA outcomes by day type (weekday vs. weekend)") %>%
+  arrange(variable, employment_status) %>%
+  kable(caption = "Key EMA outcomes by day type and employment status") %>%
   kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
                 full_width = FALSE)
 ```
