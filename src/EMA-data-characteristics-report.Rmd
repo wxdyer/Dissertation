@@ -149,7 +149,7 @@ check_validity <- function(df) {
 # Load preprocessed dataset from Report 1 output
 study_sample <- readRDS(here("output", "cleaned_study_sample.RDS"))
 
-# Part 6 completer IDs (any participant with Part 6 data)
+# Part 6 completer IDs (any participant with complete Part 6 data)
 part6_completers <- study_sample %>%
   filter(study_part == 6) %>%
   distinct(participant_id) %>%
@@ -353,7 +353,7 @@ baseline_chars %>%
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 30, hjust = 1))
 
-# --- Table 5: Employment status ---
+# --- Table 4: Employment status ---
 baseline_chars %>%
   count(employment_status) %>%
   mutate(pct = round(n / sum(n) * 100, 1)) %>%
@@ -498,7 +498,7 @@ ggplot(submission_df, aes(x = submission_rate, fill = completion_group)) +
 
 ## Valid Observations Rate
 
-This section characterizes the proportion of submitted surveys that meet all item-completeness criteria specific to this project (non-missing mood, smoke, before_survey, and at least one branch variable). These are the observations available for dissertation analyses.
+This section characterizes the proportion of submitted surveys that meet all item-completeness criteria specific to this project (non-missing mood, smoke, before_survey, and at least one branch variable -- pleasant / unpleasant). These are the observations available for within-person analyses.
 
 ```{r compliance-summary}
 compliance_df <- study_sample %>%
@@ -658,7 +658,8 @@ validity_audit %>%
   arrange(participant_id, study_part) %>%
   kable(caption = "Participants where branch variable (pleasant/unpleasant) is the limiting validity factor") %>%
   kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
-                full_width = FALSE)
+                full_width = FALSE) %>%
+ scroll_box(height = "400px")
 
 # Wide format: drop branch_limiting before pivoting
 validity_wide <- validity_audit %>%
@@ -1897,57 +1898,7 @@ ggplot(incentive_compare, aes(x = study_part, y = mean_smoked,
 
 `r section_summary("Descriptive comparisons of smoking behavior between Part 2 and Part 6 suggest a meaningful reduction in cigarettes reported per beep during the incentivized abstinence period. Individual variability in response to the incentive is substantial, as reflected in the wide distributions. These results are framed descriptively and will inform whether study part or incentive-related variables need to be accounted for in the main analyses.")`
 
----
 
-# Available Cases
-
-`r committee_note("The committee requested the number of available cases for each Aim, including a CONSORT diagram.")`
-
-The table below summarizes available participants and valid observations for each dissertation Aim. Full participant-level detail is provided in the Validity Audit section above, and the CONSORT diagram in Section 3 documents the flow from screening through study completion.
-
-```{r available-cases}
-# Aims 1 & 2 — Part 2 data
-n_part_aim12 <- study_sample %>%
-  filter(study_part == 2) %>%
-  mutate(valid = check_validity(.)) %>%
-  filter(valid == 1) %>%
-  distinct(participant_id) %>%
-  nrow()
-
-n_obs_aim12 <- study_sample %>%
-  filter(study_part == 2) %>%
-  mutate(valid = check_validity(.)) %>%
-  filter(valid == 1) %>%
-  nrow()
-
-# Aim 3 — Part 6 data (valid completers only)
-n_part_aim3 <- study_sample %>%
-  filter(study_part == 6) %>%
-  mutate(valid = check_validity(.)) %>%
-  filter(valid == 1) %>%
-  distinct(participant_id) %>%
-  nrow()
-
-n_obs_aim3 <- study_sample %>%
-  filter(study_part == 6) %>%
-  mutate(valid = check_validity(.)) %>%
-  filter(valid == 1) %>%
-  nrow()
-
-tibble(
-  Aim              = c("Aims 1 & 2 (Part 2 data)",
-                       "Aim 3 (Part 6 data)"),
-  N_participants   = c(n_part_aim12, n_part_aim3),
-  N_valid_obs      = c(n_obs_aim12, n_obs_aim3),
-  Notes            = c(
-    "Full Part 2 analytic sample; excludes participant 416 (missing baseline covariates) from covariate-dependent models",
-    "Part 6 completers with valid observations; excludes participant 223 (zero valid Part 6 observations)"
-  )
-) %>%
-  kable(caption = "Available cases by dissertation Aim") %>%
-  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
-                full_width = TRUE)
-```
 
 ---
 
@@ -2226,7 +2177,57 @@ ggplot(daily_aim3, aes(x = dayno)) +
 
 ---
 
+---
 
+# Available Cases
+
+`r committee_note("The committee requested the number of available cases for each Aim, including a CONSORT diagram.")`
+
+The table below summarizes available participants and valid observations for each dissertation Aim. Full participant-level detail is provided in the Validity Audit section above, and the CONSORT diagram in Section 3 documents the flow from screening through study completion.
+
+```{r available-cases}
+# Aims 1 & 2 — Part 2 data
+n_part_aim12 <- study_sample %>%
+  filter(study_part == 2) %>%
+  mutate(valid = check_validity(.)) %>%
+  filter(valid == 1) %>%
+  distinct(participant_id) %>%
+  nrow()
+
+n_obs_aim12 <- study_sample %>%
+  filter(study_part == 2) %>%
+  mutate(valid = check_validity(.)) %>%
+  filter(valid == 1) %>%
+  nrow()
+
+# Aim 3 — Part 6 data (valid completers only)
+n_part_aim3 <- study_sample %>%
+  filter(study_part == 6) %>%
+  mutate(valid = check_validity(.)) %>%
+  filter(valid == 1) %>%
+  distinct(participant_id) %>%
+  nrow()
+
+n_obs_aim3 <- study_sample %>%
+  filter(study_part == 6) %>%
+  mutate(valid = check_validity(.)) %>%
+  filter(valid == 1) %>%
+  nrow()
+
+tibble(
+  Aim              = c("Aims 1 & 2 (Part 2 data)",
+                       "Aim 3 (Part 6 data)"),
+  N_participants   = c(n_part_aim12, n_part_aim3),
+  N_valid_obs      = c(n_obs_aim12, n_obs_aim3),
+  Notes            = c(
+    "Full Part 2 analytic sample; excludes participant 416 (missing baseline covariates) from covariate-dependent models",
+    "Part 6 completers with valid observations; excludes participant 223 (zero valid Part 6 observations)"
+  )
+) %>%
+  kable(caption = "Available cases by dissertation Aim") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = TRUE)
+```
 ---
 
 # References
