@@ -443,7 +443,62 @@ digraph consort {
 
 This section examines how well participants engaged with the EMA protocol.
 
-## Compliance
+## Overall Survey Submission Rate
+
+This section characterizes how many surveys participants submitted, regardless of item completeness. A submitted survey is defined as any observation with a non-missing `completion_time`. This provides a broad view of participant engagement with the EMA protocol.
+
+```{r submission-summary}
+# Overall submission rate — non-missing completion_time
+submission_df <- study_sample %>%
+  group_by(participant_id) %>%
+  summarise(
+    submitted_beeps  = sum(!is.na(completion_time)),
+    max_dayno        = max(dayno, na.rm = TRUE),
+    total_possible   = if_else(max_dayno <= 3, 18L, 60L),
+    completion_group = if_else(max_dayno <= 3,
+                                "Part 2 Only (3 days)",
+                                "Parts 2 + 6 (10 days)"),
+    submission_rate  = submitted_beeps / total_possible
+  ) %>%
+  ungroup()
+
+submission_df %>%
+  group_by(completion_group) %>%
+  summarise(
+    n                    = n(),
+    mean_submitted       = round(mean(submitted_beeps), 1),
+    mean_possible        = round(mean(total_possible), 1),
+    mean_submission_rate = round(mean(submission_rate), 3),
+    min_submission_rate  = round(min(submission_rate), 3),
+    max_submission_rate  = round(max(submission_rate), 3)
+  ) %>%
+  kable(caption = "Overall survey submission rate by study completion group (submitted = non-missing completion_time, regardless of item completeness)") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = FALSE)
+```
+
+```{r submission-plot}
+ggplot(submission_df, aes(x = submission_rate, fill = completion_group)) +
+  geom_histogram(binwidth = 0.05, boundary = 0, color = "white") +
+  scale_x_continuous(
+    limits = c(0, 1),
+    breaks = seq(0, 1, by = 0.1),
+    labels = scales::percent_format(accuracy = 1)
+  ) +
+  facet_wrap(~ completion_group, ncol = 1) +
+  labs(
+    title = "Distribution of overall survey submission rate by study completion group",
+    subtitle = "Submission = any survey with non-missing completion_time",
+    x     = "Submission rate (% of possible EMA prompts)",
+    y     = "Number of participants"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+## Valid Observations Rate
+
+This section characterizes the proportion of submitted surveys that meet all item-completeness criteria specific to this project (non-missing mood, smoke, before_survey, and at least one branch variable). These are the observations available for dissertation analyses.
 
 ```{r compliance-summary}
 compliance_df <- study_sample %>%
@@ -471,7 +526,7 @@ compliance_df %>%
     min_compliance   = round(min(compliance), 3),
     max_compliance   = round(max(compliance), 3)
   ) %>%
-  kable(caption = "Compliance summary by study completion group") %>%
+  kable(caption = "Valid observations summary by study completion group (valid = item-complete per project-specific criteria)") %>%
   kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
                 full_width = FALSE)
 ```
@@ -486,17 +541,18 @@ ggplot(compliance_df, aes(x = compliance, fill = completion_group)) +
   ) +
   facet_wrap(~ completion_group, ncol = 1) +
   labs(
-    title = "Distribution of participant compliance by study completion group",
-    x     = "Compliance (% of possible EMA prompts)",
+    title = "Distribution of valid observation rate by study completion group",
+    subtitle = "Valid = item-complete per project-specific criteria",
+    x     = "Valid observation rate (% of possible EMA prompts)",
     y     = "Number of participants"
   ) +
   theme_minimal() +
   theme(legend.position = "none")
 ```
 
-## Compliance Trends and Participant Characteristics
+## Valid Observations: Associations with Participant Characteristics
 
-`r committee_note("The committee asked whether there are significant trends in non-compliance that should be accounted for (e.g., participant characteristics).")`
+`r committee_note("The committee asked whether there are significant trends in non-compliance that should be accounted for (e.g., participant characteristics). The analysis below examines associations between baseline characteristics and the rate of item-complete (valid) observations.")`
 
 ```{r compliance-trends}
 # Merge compliance with baseline characteristics
@@ -558,7 +614,7 @@ for (i in seq_len(n_vars)) {
 }
 
 as.data.frame(display_mat) %>%
-  kable(caption = "Correlations between compliance and baseline characteristics. * p < .05, ** p < .01, *** p < .001, . p < .10") %>%
+  kable(caption = "Correlations between valid observation rate and baseline characteristics. * p < .05, ** p < .01, *** p < .001, . p < .10") %>%
   kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
                 full_width = FALSE)
 ```
@@ -697,7 +753,7 @@ study_sample %>%
 
 `r endbutton()`
 
-`r section_summary("Overall compliance was generally good across participants, though variability was present. Compliance trends were examined in relation to baseline participant characteristics to assess whether non-compliance was systematic. A participant-level validity audit identified cases where the branch variable (pleasant/unpleasant) was the limiting factor for observation-level validity — notably, participant 223 had zero valid observations during Part 6 and only 2 during Part 2, rendering them unusable for analyses requiring the full validity criteria. Missingness was concentrated in the branch variables, consistent with the branching structure of the survey. Beep timing followed the expected 2-hour interval sampling scheme across weekdays and weekends.")`
+`r section_summary("Overall survey submission rates were generally high across participants. Valid observation rates — reflecting item completeness per project-specific criteria — were also examined and are the primary metric for available cases in dissertation analyses. A participant-level validity audit identified cases where the branch variable (pleasant/unpleasant) was the limiting factor for observation-level validity — notably, participant 223 had zero valid observations during Part 6 and only 2 during Part 2, rendering them unusable for analyses requiring the full validity criteria. Missingness was concentrated in the branch variables, consistent with the branching structure of the survey. Beep timing followed the expected 2-hour interval sampling scheme across weekdays and weekends.")`
 
 ---
 
@@ -705,7 +761,7 @@ study_sample %>%
 
 `r committee_note("The committee requested examination of how baseline participant characteristics relate to study engagement and key EMA outcomes. Results are organized thematically and are intended to inform covariate selection and interpretation of individual differences in the main analyses.")`
 
-This section examines associations between baseline participant characteristics and two sets of outcomes: (1) study engagement indicators (compliance, attrition, valid observations) and (2) person-level means of key EMA outcomes (craving, mood, pleasant event appraisal ratings, unpleasant event appraisal ratings, and prior mood). All EMA outcome means are computed at the person level from valid observations. For continuous predictors, Pearson correlations with significance stars are reported. For gender, independent samples t-tests are used to compare means between Male and Female participants.
+This section examines associations between baseline participant characteristics and two sets of outcomes: (1) study engagement indicators (valid observation rate, dropout, number of valid observations) and (2) person-level means of key EMA outcomes (craving, mood, pleasant event appraisal ratings, unpleasant event appraisal ratings, and prior mood). All EMA outcome means are computed at the person level from valid observations. For continuous predictors, Pearson correlations with significance stars are reported. For gender, independent samples t-tests are used to compare means between Male and Female participants.
 
 ```{r characteristics-prep}
 # Person-level EMA outcome means (valid observations only)
@@ -772,7 +828,7 @@ cor_table <- function(data, predictors, outcomes,
 
 # Variable label lookups
 engagement_vars   <- c("compliance", "attrition", "n_valid")
-engagement_labels <- c("Compliance", "Attrition\n(1=Part2 only)", "N Valid Obs")
+engagement_labels <- c("Valid Obs Rate", "Dropout\n(1=Did not complete Part 6)", "N Valid Obs")
 
 outcome_vars   <- c("mean_craving", "mean_mood", "mean_pleasant",
                     "mean_unpleasant", "mean_prior_mood")
@@ -905,7 +961,7 @@ gender_ttest <- function(data, outcomes, outcome_labels) {
 }
 
 all_outcomes      <- c(engagement_vars, outcome_vars)
-all_outcome_labels <- c("Compliance", "Attrition (1=Part2 only)",
+all_outcome_labels <- c("Valid Obs Rate", "Dropout (1=Did not complete Part 6)",
                          "N Valid Observations",
                          "Craving", "Mood", "Pleasant Rating",
                          "Unpleasant Rating", "Prior Mood")
@@ -1185,6 +1241,8 @@ as.data.frame(mat) %>%
 
 *Following Siepe et al. (2024), this section examines key EMA outcomes as a function of consecutive days without smoking during Part 6. The sample shrinks as participants resume smoking — n at each abstinence day is reported. This analysis covers up to 7 days of abstinence and is restricted to Part 6 completers.*
 
+**Operationalization of abstinence:** A participant is considered abstinent on a given Part 6 day if `smoked_since_last_survey == 0` across all valid beeps on that day. Consecutive abstinence days are counted as unbroken streaks — if a participant smokes on any day, the streak resets to zero. This definition differs from the "Quitter" category in the Change over Time section, which is defined as a mean Part 6 daily smoking value ≤ 0.1 across all Part 6 days. As a result, the N of participants appearing in the abstinence streak table on Day 1 may differ from the N of Quitters in the change category table — a participant can qualify as a Quitter based on their overall average while still having smoked briefly early in Part 6, and vice versa.
+
 ```{r abstinence-days}
 # For each Part 6 completer, identify consecutive abstinence days
 # A participant is "abstinent on day X" if smoked_since_last_survey == 0
@@ -1383,197 +1441,6 @@ cross_lag %>%
   kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
                 full_width = FALSE)
 ```
-
----
-
-# Change over Time
-
-<!-- This section examines potentially meaningful change over time in craving, reward processing,
-     and cigarette use among Part 6 completers. Analyses here are descriptive and designed to
-     inform the feasibility and scope of Aim 3 analyses prior to formal modeling. -->
-
-*This section examines craving, reward processing, and cigarette use trajectories among Part 6 completers across the 10-day study period. Results are intended to characterize potentially meaningful change over time and assess the feasibility of Aim 3 analyses.*
-
-`r committee_note("This section is intended to assess whether the data support the proposed Aim 3 analyses, including the feasibility of regression-based analyses across change categories (Quitter, Reducer, Stable, Increaser).")`
-
-```{r aim3-feasibility}
-# Ensure person_class and part6_deviation are available
-# (recompute here for independence from earlier chunks)
-
-# Smoking completers with daily totals
-smoking_completers_aim3 <- study_sample %>%
-  mutate(valid = check_validity(.)) %>%
-  filter(valid == 1,
-         participant_id %in% valid_completers,
-         !is.na(smoked_since_last_survey),
-         !is.na(dayno)) %>%
-  group_by(participant_id, dayno) %>%
-  summarise(
-    daily_smoked    = sum(smoked_since_last_survey, na.rm = TRUE),
-    mean_craving    = mean(smoke, na.rm = TRUE),
-    mean_mood       = mean(mood, na.rm = TRUE),
-    mean_pleasant   = mean(pleasant, na.rm = TRUE),
-    reward_processing = mean(pleasant * mood / 100, na.rm = TRUE),
-    .groups = "drop"
-  ) %>%
-  mutate(part = ifelse(dayno <= 3, "Part 2 (Baseline)", "Part 6 (Incentive)"))
-
-# Baseline means per person
-baseline_aim3 <- smoking_completers_aim3 %>%
-  filter(dayno <= 3) %>%
-  group_by(participant_id) %>%
-  summarise(
-    baseline_smoked           = mean(daily_smoked, na.rm = TRUE),
-    baseline_craving          = mean(mean_craving, na.rm = TRUE),
-    baseline_reward           = mean(reward_processing, na.rm = TRUE),
-    .groups = "drop"
-  )
-
-# Part 6 means per person
-part6_aim3 <- smoking_completers_aim3 %>%
-  filter(dayno > 3) %>%
-  group_by(participant_id) %>%
-  summarise(
-    part6_smoked   = mean(daily_smoked, na.rm = TRUE),
-    part6_craving  = mean(mean_craving, na.rm = TRUE),
-    part6_reward   = mean(reward_processing, na.rm = TRUE),
-    .groups = "drop"
-  )
-
-# Merge and classify
-aim3_data <- baseline_aim3 %>%
-  left_join(part6_aim3, by = "participant_id") %>%
-  mutate(
-    change_cat = case_when(
-      part6_smoked <= 0.1                            ~ "Quitter",
-      part6_smoked < baseline_smoked * 0.80          ~ "Reducer",
-      part6_smoked > baseline_smoked * 1.20          ~ "Increaser",
-      TRUE                                            ~ "Stable"
-    ),
-    delta_craving = part6_craving - baseline_craving,
-    delta_reward  = part6_reward  - baseline_reward,
-    delta_smoked  = part6_smoked  - baseline_smoked
-  )
-
-# --- Table: Group sizes and feasibility check ---
-aim3_data %>%
-  count(change_cat) %>%
-  mutate(pct = round(n / sum(n) * 100, 1)) %>%
-  rename(`Change Category` = change_cat, N = n, `%` = pct) %>%
-  kable(caption = "Sample size by change category — feasibility check for Aim 3 regression analyses") %>%
-  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
-                full_width = FALSE)
-
-# --- Table: Mean changes in craving and reward by category ---
-aim3_data %>%
-  group_by(change_cat) %>%
-  summarise(
-    n                    = n(),
-    mean_delta_craving   = round(mean(delta_craving, na.rm = TRUE), 2),
-    sd_delta_craving     = round(sd(delta_craving, na.rm = TRUE), 2),
-    mean_delta_reward    = round(mean(delta_reward, na.rm = TRUE), 2),
-    sd_delta_reward      = round(sd(delta_reward, na.rm = TRUE), 2),
-    mean_delta_smoked    = round(mean(delta_smoked, na.rm = TRUE), 2),
-    sd_delta_smoked      = round(sd(delta_smoked, na.rm = TRUE), 2),
-    .groups = "drop"
-  ) %>%
-  rename(
-    `Change Category`      = change_cat,
-    N                      = n,
-    `Δ Craving M`          = mean_delta_craving,
-    `Δ Craving SD`         = sd_delta_craving,
-    `Δ Reward M`           = mean_delta_reward,
-    `Δ Reward SD`          = sd_delta_reward,
-    `Δ Smoking M`          = mean_delta_smoked,
-    `Δ Smoking SD`         = sd_delta_smoked
-  ) %>%
-  kable(caption = "Mean changes (Part 6 minus Part 2 baseline) in craving, reward processing, and smoking by change category. Δ = Part 6 mean minus Part 2 mean.") %>%
-  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
-                full_width = FALSE)
-```
-
-```{r aim3-spaghetti}
-# Build daily data with change category for spaghetti plot
-daily_aim3 <- smoking_completers_aim3 %>%
-  left_join(aim3_data %>% select(participant_id, change_cat),
-            by = "participant_id") %>%
-  filter(!is.na(change_cat))
-
-# Group means per day per category
-group_means_aim3 <- daily_aim3 %>%
-  group_by(dayno, change_cat) %>%
-  summarise(
-    group_craving = mean(mean_craving, na.rm = TRUE),
-    .groups = "drop"
-  )
-
-# Spaghetti plot: individual craving trajectories + group mean by change category
-ggplot(daily_aim3, aes(x = dayno, y = mean_craving)) +
-  geom_line(aes(group = participant_id), alpha = 0.2, color = "gray60") +
-  geom_line(data = group_means_aim3,
-            aes(y = group_craving, color = change_cat),
-            linewidth = 1.5) +
-  geom_vline(xintercept = 3.5, linetype = "dashed", color = "gray40") +
-  scale_color_manual(
-    values = c(
-      "Quitter"   = "darkgreen",
-      "Reducer"   = "steelblue",
-      "Stable"    = "gray40",
-      "Increaser" = "tomato"
-    )
-  ) +
-  scale_x_continuous(breaks = 1:10) +
-  annotate("text", x = 2, y = Inf, label = "Part 2\n(Baseline)",
-           vjust = 1.5, size = 3, color = "gray40") +
-  annotate("text", x = 7, y = Inf, label = "Part 6\n(Incentive)",
-           vjust = 1.5, size = 3, color = "gray40") +
-  labs(
-    title    = "Daily craving trajectories by smoking change category (Part 6 completers)",
-    subtitle = "Light lines = individual trajectories; bold lines = group means by change category",
-    x        = "Study day",
-    y        = "Mean daily craving",
-    color    = "Change category"
-  ) +
-  theme_minimal()
-
-# Same plot for reward processing
-group_means_reward <- daily_aim3 %>%
-  group_by(dayno, change_cat) %>%
-  summarise(group_reward = mean(reward_processing, na.rm = TRUE), .groups = "drop")
-
-ggplot(daily_aim3, aes(x = dayno, y = reward_processing)) +
-  geom_line(aes(group = participant_id), alpha = 0.2, color = "gray60") +
-  geom_line(data = group_means_reward,
-            aes(y = group_reward, color = change_cat),
-            linewidth = 1.5) +
-  geom_vline(xintercept = 3.5, linetype = "dashed", color = "gray40") +
-  scale_color_manual(
-    values = c(
-      "Quitter"   = "darkgreen",
-      "Reducer"   = "steelblue",
-      "Stable"    = "gray40",
-      "Increaser" = "tomato"
-    )
-  ) +
-  scale_x_continuous(breaks = 1:10) +
-  annotate("text", x = 2, y = Inf, label = "Part 2\n(Baseline)",
-           vjust = 1.5, size = 3, color = "gray40") +
-  annotate("text", x = 7, y = Inf, label = "Part 6\n(Incentive)",
-           vjust = 1.5, size = 3, color = "gray40") +
-  labs(
-    title    = "Daily reward processing trajectories by smoking change category (Part 6 completers)",
-    subtitle = "Reward processing = pleasant × mood / 100. Light lines = individual; bold = group mean",
-    x        = "Study day",
-    y        = "Mean daily reward processing index",
-    color    = "Change category"
-  ) +
-  theme_minimal()
-```
-
-`r section_summary("Preliminary descriptive evidence for Aim 3 is presented above. Craving and reward processing trajectories are plotted by smoking change category across the full 10-day study period. Group sizes by change category are reported to assess whether regression-based analyses are feasible. Mean changes in craving, reward processing, and smoking from Part 2 baseline to Part 6 are summarized by category. These results will inform the analytic approach and scope of Aim 3.")`
-
----
-
 # Smoking Behavior
 
 `r committee_note("This section addresses several committee questions about cigarette use behavior over the course of the study.")`
@@ -2034,10 +1901,331 @@ ggplot(incentive_compare, aes(x = study_part, y = mean_smoked,
 
 # Available Cases
 
-
 `r committee_note("The committee requested the number of available cases for each Aim, including a CONSORT diagram.")`
 
-Available cases by Aim are summarized in the Validity Audit section above. See Section 3 for the CONSORT diagram.
+The table below summarizes available participants and valid observations for each dissertation Aim. Full participant-level detail is provided in the Validity Audit section above, and the CONSORT diagram in Section 3 documents the flow from screening through study completion.
+
+```{r available-cases}
+# Aims 1 & 2 — Part 2 data
+n_part_aim12 <- study_sample %>%
+  filter(study_part == 2) %>%
+  mutate(valid = check_validity(.)) %>%
+  filter(valid == 1) %>%
+  distinct(participant_id) %>%
+  nrow()
+
+n_obs_aim12 <- study_sample %>%
+  filter(study_part == 2) %>%
+  mutate(valid = check_validity(.)) %>%
+  filter(valid == 1) %>%
+  nrow()
+
+# Aim 3 — Part 6 data (valid completers only)
+n_part_aim3 <- study_sample %>%
+  filter(study_part == 6) %>%
+  mutate(valid = check_validity(.)) %>%
+  filter(valid == 1) %>%
+  distinct(participant_id) %>%
+  nrow()
+
+n_obs_aim3 <- study_sample %>%
+  filter(study_part == 6) %>%
+  mutate(valid = check_validity(.)) %>%
+  filter(valid == 1) %>%
+  nrow()
+
+tibble(
+  Aim              = c("Aims 1 & 2 (Part 2 data)",
+                       "Aim 3 (Part 6 data)"),
+  N_participants   = c(n_part_aim12, n_part_aim3),
+  N_valid_obs      = c(n_obs_aim12, n_obs_aim3),
+  Notes            = c(
+    "Full Part 2 analytic sample; excludes participant 416 (missing baseline covariates) from covariate-dependent models",
+    "Part 6 completers with valid observations; excludes participant 223 (zero valid Part 6 observations)"
+  )
+) %>%
+  kable(caption = "Available cases by dissertation Aim") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = TRUE)
+```
+
+---
+
+---
+
+---
+
+# Change over Time
+
+<!-- This section examines potentially meaningful change over time in craving, reward processing,
+     and cigarette use among Part 6 completers. Analyses here are descriptive and designed to
+     inform the feasibility and scope of Aim 3 analyses prior to formal modeling. -->
+
+*This section examines craving, reward processing, and cigarette use trajectories among Part 6 completers across the 10-day study period. Results are intended to characterize potentially meaningful change over time and assess the feasibility of Aim 3 analyses.*
+
+`r committee_note("This section is intended to assess whether the data support the proposed Aim 3 analyses, including the feasibility of regression-based analyses across change categories (Quitter, Reducer, Stable, Increaser).")`
+
+```{r aim3-feasibility}
+# Ensure person_class and part6_deviation are available
+# (recompute here for independence from earlier chunks)
+
+# Change categories are defined using mean Part 6 daily smoking relative to
+# the individual Part 2 baseline mean:
+#   Quitter   = mean Part 6 daily smoking <= 0.1 (effectively zero across Part 6)
+#   Reducer   = mean Part 6 daily smoking < 80% of Part 2 baseline mean
+#   Stable    = mean Part 6 daily smoking within 20% of Part 2 baseline mean
+#   Increaser = mean Part 6 daily smoking > 120% of Part 2 baseline mean
+#
+# Note: This operationalization differs from the consecutive abstinence streak
+# used in the abstinence days section. A Quitter here may have smoked briefly
+# early in Part 6 but averaged near-zero across the full period.
+# Conversely, a participant with a perfect streak on early days might average
+# above zero overall due to later smoking. This explains any N discrepancy
+# between the two sections.
+
+# Smoking completers with daily totals
+smoking_completers_aim3 <- study_sample %>%
+  mutate(valid = check_validity(.)) %>%
+  filter(valid == 1,
+         participant_id %in% valid_completers,
+         !is.na(smoked_since_last_survey),
+         !is.na(dayno)) %>%
+  group_by(participant_id, dayno) %>%
+  summarise(
+    daily_smoked    = sum(smoked_since_last_survey, na.rm = TRUE),
+    mean_craving    = mean(smoke, na.rm = TRUE),
+    mean_mood       = mean(mood, na.rm = TRUE),
+    mean_pleasant   = mean(pleasant, na.rm = TRUE),
+    reward_processing = mean(pleasant * mood / 100, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(part = ifelse(dayno <= 3, "Part 2 (Baseline)", "Part 6 (Incentive)"))
+
+# Baseline means per person
+baseline_aim3 <- smoking_completers_aim3 %>%
+  filter(dayno <= 3) %>%
+  group_by(participant_id) %>%
+  summarise(
+    baseline_smoked           = mean(daily_smoked, na.rm = TRUE),
+    baseline_craving          = mean(mean_craving, na.rm = TRUE),
+    baseline_reward           = mean(reward_processing, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Part 6 means per person
+part6_aim3 <- smoking_completers_aim3 %>%
+  filter(dayno > 3) %>%
+  group_by(participant_id) %>%
+  summarise(
+    part6_smoked   = mean(daily_smoked, na.rm = TRUE),
+    part6_craving  = mean(mean_craving, na.rm = TRUE),
+    part6_reward   = mean(reward_processing, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Merge and classify
+aim3_data <- baseline_aim3 %>%
+  left_join(part6_aim3, by = "participant_id") %>%
+  mutate(
+    change_cat = case_when(
+      part6_smoked <= 0.1                            ~ "Quitter",
+      part6_smoked < baseline_smoked * 0.80          ~ "Reducer",
+      part6_smoked > baseline_smoked * 1.20          ~ "Increaser",
+      TRUE                                            ~ "Stable"
+    ),
+    delta_craving = part6_craving - baseline_craving,
+    delta_reward  = part6_reward  - baseline_reward,
+    delta_smoked  = part6_smoked  - baseline_smoked
+  )
+
+# --- Table: Group sizes and feasibility check ---
+aim3_data %>%
+  count(change_cat) %>%
+  mutate(pct = round(n / sum(n) * 100, 1)) %>%
+  rename(`Change Category` = change_cat, N = n, `%` = pct) %>%
+  kable(caption = "Sample size by change category — feasibility check for Aim 3 regression analyses") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = FALSE)
+
+# --- Table: Mean changes in craving and reward by category ---
+aim3_data %>%
+  group_by(change_cat) %>%
+  summarise(
+    n                    = n(),
+    mean_delta_craving   = round(mean(delta_craving, na.rm = TRUE), 2),
+    sd_delta_craving     = round(sd(delta_craving, na.rm = TRUE), 2),
+    mean_delta_reward    = round(mean(delta_reward, na.rm = TRUE), 2),
+    sd_delta_reward      = round(sd(delta_reward, na.rm = TRUE), 2),
+    mean_delta_smoked    = round(mean(delta_smoked, na.rm = TRUE), 2),
+    sd_delta_smoked      = round(sd(delta_smoked, na.rm = TRUE), 2),
+    .groups = "drop"
+  ) %>%
+  rename(
+    `Change Category`      = change_cat,
+    N                      = n,
+    `Δ Craving M`          = mean_delta_craving,
+    `Δ Craving SD`         = sd_delta_craving,
+    `Δ Reward M`           = mean_delta_reward,
+    `Δ Reward SD`          = sd_delta_reward,
+    `Δ Smoking M`          = mean_delta_smoked,
+    `Δ Smoking SD`         = sd_delta_smoked
+  ) %>%
+  kable(caption = "Mean changes (Part 6 minus Part 2 baseline) in craving, reward processing, and smoking by change category. Δ = Part 6 mean minus Part 2 mean.") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),
+                full_width = FALSE)
+```
+
+```{r aim3-spaghetti}
+# Build daily data with change category for spaghetti plot
+daily_aim3 <- smoking_completers_aim3 %>%
+  left_join(aim3_data %>% select(participant_id, change_cat),
+            by = "participant_id") %>%
+  filter(!is.na(change_cat))
+
+# Group means per day per category
+group_means_aim3 <- daily_aim3 %>%
+  group_by(dayno, change_cat) %>%
+  summarise(
+    group_craving = mean(mean_craving, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Spaghetti plot: individual craving trajectories + group mean by change category
+ggplot(daily_aim3, aes(x = dayno, y = mean_craving)) +
+  geom_line(aes(group = participant_id), alpha = 0.2, color = "gray60") +
+  geom_line(data = group_means_aim3,
+            aes(y = group_craving, color = change_cat),
+            linewidth = 1.5) +
+  geom_vline(xintercept = 3.5, linetype = "dashed", color = "gray40") +
+  scale_color_manual(
+    values = c(
+      "Quitter"   = "darkgreen",
+      "Reducer"   = "steelblue",
+      "Stable"    = "gray40",
+      "Increaser" = "tomato"
+    )
+  ) +
+  scale_x_continuous(breaks = 1:10) +
+  annotate("text", x = 2, y = Inf, label = "Part 2\n(Baseline)",
+           vjust = 1.5, size = 3, color = "gray40") +
+  annotate("text", x = 7, y = Inf, label = "Part 6\n(Incentive)",
+           vjust = 1.5, size = 3, color = "gray40") +
+  labs(
+    title    = "Daily craving trajectories by smoking change category (Part 6 completers)",
+    subtitle = "Light lines = individual trajectories; bold lines = group means by change category",
+    x        = "Study day",
+    y        = "Mean daily craving",
+    color    = "Change category"
+  ) +
+  theme_minimal()
+
+# --- Plot 2a: Mood (thick) + Pleasant (dotted) by change category ---
+group_means_mood <- daily_aim3 %>%
+  group_by(dayno, change_cat) %>%
+  summarise(
+    group_mood    = mean(mean_mood, na.rm = TRUE),
+    group_pleasant = mean(mean_pleasant, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+change_colors <- c(
+  "Quitter"   = "darkgreen",
+  "Reducer"   = "steelblue",
+  "Stable"    = "gray40",
+  "Increaser" = "tomato"
+)
+
+ggplot(daily_aim3, aes(x = dayno)) +
+  geom_line(aes(y = mean_mood, group = participant_id),
+            alpha = 0.15, color = "gray60") +
+  geom_line(data = group_means_mood,
+            aes(y = group_mood, color = change_cat),
+            linewidth = 1.5) +
+  geom_line(data = group_means_mood,
+            aes(y = group_pleasant, color = change_cat),
+            linewidth = 1, linetype = "dotted") +
+  geom_vline(xintercept = 3.5, linetype = "dashed", color = "gray40") +
+  scale_color_manual(values = change_colors) +
+  scale_x_continuous(breaks = 1:10) +
+  annotate("text", x = 2, y = Inf, label = "Part 2\n(Baseline)",
+           vjust = 1.5, size = 3, color = "gray40") +
+  annotate("text", x = 7, y = Inf, label = "Part 6\n(Incentive)",
+           vjust = 1.5, size = 3, color = "gray40") +
+  labs(
+    title    = "Mood and pleasant rating trajectories by change category (Part 6 completers)",
+    subtitle = "Solid lines = mood; dotted lines = pleasant rating; bold = group means; light gray = individual trajectories",
+    x        = "Study day",
+    y        = "Mean daily value",
+    color    = "Change category"
+  ) +
+  theme_minimal()
+
+# --- Plot 2b: Mood (thick) + Unpleasant (dotted) by change category ---
+group_means_mood2 <- daily_aim3 %>%
+  group_by(dayno, change_cat) %>%
+  summarise(
+    group_mood      = mean(mean_mood, na.rm = TRUE),
+    group_unpleasant = mean(mean_mood - mean_mood + mean_pleasant, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Recompute with unpleasant properly
+group_means_unpleasant <- smoking_completers_aim3 %>%
+  left_join(aim3_data %>% select(participant_id, change_cat),
+            by = "participant_id") %>%
+  filter(!is.na(change_cat)) %>%
+  group_by(participant_id, dayno) %>%
+  summarise(
+    mean_mood      = mean(mean_mood, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  left_join(
+    study_sample %>%
+      mutate(valid = check_validity(.)) %>%
+      filter(valid == 1, participant_id %in% valid_completers) %>%
+      group_by(participant_id, dayno) %>%
+      summarise(mean_unpleasant = mean(unpleasant, na.rm = TRUE), .groups = "drop"),
+    by = c("participant_id", "dayno")
+  ) %>%
+  left_join(aim3_data %>% select(participant_id, change_cat), by = "participant_id") %>%
+  filter(!is.na(change_cat)) %>%
+  group_by(dayno, change_cat) %>%
+  summarise(
+    group_mood       = mean(mean_mood, na.rm = TRUE),
+    group_unpleasant = mean(mean_unpleasant, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+ggplot(daily_aim3, aes(x = dayno)) +
+  geom_line(aes(y = mean_mood, group = participant_id),
+            alpha = 0.15, color = "gray60") +
+  geom_line(data = group_means_unpleasant,
+            aes(y = group_mood, color = change_cat),
+            linewidth = 1.5) +
+  geom_line(data = group_means_unpleasant,
+            aes(y = group_unpleasant, color = change_cat),
+            linewidth = 1, linetype = "dotted") +
+  geom_vline(xintercept = 3.5, linetype = "dashed", color = "gray40") +
+  scale_color_manual(values = change_colors) +
+  scale_x_continuous(breaks = 1:10) +
+  annotate("text", x = 2, y = Inf, label = "Part 2\n(Baseline)",
+           vjust = 1.5, size = 3, color = "gray40") +
+  annotate("text", x = 7, y = Inf, label = "Part 6\n(Incentive)",
+           vjust = 1.5, size = 3, color = "gray40") +
+  labs(
+    title    = "Mood and unpleasant rating trajectories by change category (Part 6 completers)",
+    subtitle = "Solid lines = mood; dotted lines = unpleasant rating; bold = group means; light gray = individual trajectories",
+    x        = "Study day",
+    y        = "Mean daily value",
+    color    = "Change category"
+  ) +
+  theme_minimal()
+```
+
+`r section_summary("Preliminary descriptive evidence for Aim 3 is presented above. Craving and reward processing trajectories are plotted by smoking change category across the full 10-day study period. Group sizes by change category are reported to assess whether regression-based analyses are feasible. Mean changes in craving, reward processing, and smoking from Part 2 baseline to Part 6 are summarized by category. These results will inform the analytic approach and scope of Aim 3.")`
+
+---
+
 
 ---
 
