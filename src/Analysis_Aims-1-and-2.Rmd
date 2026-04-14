@@ -1,0 +1,603 @@
+---
+title: "Aims 1 & 2: Modeling Craving, Activity Appraisal, and Mood During Ad-Libitum Smoking"
+author:
+  - name: Walter G. Dyer, wdyer@psu.edu, Penn State University
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+      toc: true
+      number_sections: false
+      toc_float: true
+      toc_depth: 3
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+```
+
+# Overview
+
+This analysis tests two complementary hypotheses about how cigarette craving is related to emotional experience during ad-libitum smoking (Part 2, baseline):
+
+**Aim 1: Pleasantness related affect**
+- Craving moderates the effect of pleasantness on mood
+- High craving *weakens* the association between pleasant activities and positive affect
+- Expected: negative interaction between pleasantness and craving
+
+**Aim 2: Unpleasantness related affect**
+- Craving moderates the effect of unpleasantness on mood
+- High craving *strengthens* the association between unpleasant activities and negative affect
+- Expected: positive interaction between unpleasantness and craving
+
+Both analyses use multilevel mixed-effects regression with sequential model building to evaluate within-person associations, moderation effects, and individual differences in reactivity patterns.
+
+**Note:** All analyses are conducted on Part 2 data only. For Aim 1, mood is filtered to > 50 (positive mood); for Aim 2, mood is filtered to < 50 (negative mood). Each aim is run on both all available data and valid-cases-only as a sensitivity check.
+
+---
+
+# Load packages and data
+
+```{r packages, message=FALSE, warning=FALSE}
+# Data management
+library(dplyr)
+library(tidyr)
+library(here)
+
+# Multilevel modeling
+library(lme4)
+library(lmerTest)
+
+# Model diagnostics and summaries
+library(performance)
+library(sjPlot)
+library(broom.mixed)
+
+# Visualization
+library(ggplot2)
+
+# Tables
+library(knitr)
+library(kableExtra)
+```
+
+```{r load-data}
+# Load preprocessed dataset
+study_sample <- readRDS(here("output", "cleaned_study_sample.RDS"))
+
+# Load validity function
+check_validity <- function(df) {
+  mood_ok          <- !is.na(df$mood)
+  before_survey_ok <- !is.na(df$before_survey)
+  smoke_ok         <- !is.na(df$smoke)
+  branch_ok        <- !is.na(df$pleasant) | !is.na(df$unpleasant)
+  as.integer(mood_ok & before_survey_ok & smoke_ok & branch_ok)
+}
+```
+
+---
+
+# AIM 1: Pleasantness Related Affect and Craving
+
+### Model 1a: Unconditional
+
+```{r aim1-all-1a}
+aim1_1a_all <- lmer(
+  mood ~ 1 + (1 | participant_id),
+  data = aim1_all_available,
+  REML = TRUE
+)
+
+summary(aim1_1a_all)
+```
+
+### Model 1b: Main effects
+
+```{r aim1-all-1b}
+aim1_1b_all <- lmer(
+  mood ~ pleasant_pmc + smoke_pmc + pleasant_pm + smoke_pm + 
+    (1 | participant_id),
+  data = aim1_all_available,
+  REML = TRUE
+)
+
+summary(aim1_1b_all)
+
+anova(aim1_1a_all, aim1_1b_all)
+```
+
+### Model 1c: Add interaction (fixed)
+
+```{r aim1-all-1c}
+aim1_1c_all <- lmer(
+  mood ~ pleasant_pmc + smoke_pmc + pleasant_pmc:smoke_pmc + 
+    pleasant_pm + smoke_pm + 
+    (1 | participant_id),
+  data = aim1_all_available,
+  REML = TRUE
+)
+
+summary(aim1_1c_all)
+
+anova(aim1_1b_all, aim1_1c_all)
+```
+
+### Model 1d: Random slope for pleasantness
+
+```{r aim1-all-1d}
+aim1_1d_all <- lmer(
+  mood ~ pleasant_pmc + smoke_pmc + pleasant_pmc:smoke_pmc + 
+    pleasant_pm + smoke_pm + 
+    (1 + pleasant_pmc || participant_id),
+  data = aim1_all_available,
+  REML = TRUE,
+  control = lmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 2e5))
+)
+
+summary(aim1_1d_all)
+
+anova(aim1_1c_all, aim1_1d_all)
+```
+
+### Model 1e: Random slope for craving
+
+```{r aim1-all-1e}
+aim1_1e_all <- lmer(
+  mood ~ pleasant_pmc + smoke_pmc + pleasant_pmc:smoke_pmc + 
+    pleasant_pm + smoke_pm + 
+    (1 + pleasant_pmc + smoke_pmc || participant_id),
+  data = aim1_all_available,
+  REML = TRUE,
+  control = lmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 2e5))
+)
+
+summary(aim1_1e_all)
+
+anova(aim1_1d_all, aim1_1e_all)
+```
+
+### Model 1f: Random slope for interaction
+
+```{r aim1-all-1f}
+aim1_1f_all <- lmer(
+  mood ~ pleasant_pmc + smoke_pmc + pleasant_pmc:smoke_pmc + 
+    pleasant_pm + smoke_pm + 
+    (1 + pleasant_pmc + smoke_pmc + pleasant_pmc:smoke_pmc || participant_id),
+  data = aim1_all_available,
+  REML = TRUE,
+  control = lmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 2e5))
+)
+
+summary(aim1_1f_all)
+
+anova(aim1_1e_all, aim1_1f_all)
+```
+
+### Model comparison summary (Aim 1, All Available)
+
+```{r aim1-all-summary}
+aim1_all_models <- list(
+  "1a: Unconditional" = aim1_1a_all,
+  "1b: Main effects" = aim1_1b_all,
+  "1c: + Interaction (fixed)" = aim1_1c_all,
+  "1d: + Random slope (pleasant)" = aim1_1d_all,
+  "1e: + Random slope (smoke)" = aim1_1e_all,
+  "1f: + Random slope (interaction)" = aim1_1f_all
+)
+
+kable(
+  data.frame(
+    Model = names(aim1_all_models),
+    AIC = sapply(aim1_all_models, AIC),
+    BIC = sapply(aim1_all_models, BIC),
+    Deviance = sapply(aim1_all_models, deviance),
+    df = sapply(aim1_all_models, function(x) attr(logLik(x), "df"))
+  ),
+  caption = "Aim 1 Model Fit Comparison (All Available Data)",
+  digits = 2
+) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+---
+
+## Aim 1: Valid Cases Only
+
+### Model 1a: Unconditional
+
+```{r aim1-valid-1a}
+aim1_1a_valid <- lmer(
+  mood ~ 1 + (1 | participant_id),
+  data = aim1_valid_only,
+  REML = TRUE
+)
+
+summary(aim1_1a_valid)
+```
+
+### Model 1b: Main effects
+
+```{r aim1-valid-1b}
+aim1_1b_valid <- lmer(
+  mood ~ pleasant_pmc + smoke_pmc + pleasant_pm + smoke_pm + 
+    (1 | participant_id),
+  data = aim1_valid_only,
+  REML = TRUE
+)
+
+summary(aim1_1b_valid)
+
+anova(aim1_1a_valid, aim1_1b_valid)
+```
+
+### Model 1c: Add interaction (fixed)
+
+```{r aim1-valid-1c}
+aim1_1c_valid <- lmer(
+  mood ~ pleasant_pmc + smoke_pmc + pleasant_pmc:smoke_pmc + 
+    pleasant_pm + smoke_pm + 
+    (1 | participant_id),
+  data = aim1_valid_only,
+  REML = TRUE
+)
+
+summary(aim1_1c_valid)
+
+anova(aim1_1b_valid, aim1_1c_valid)
+```
+
+### Model 1d: Random slope for pleasantness
+
+```{r aim1-valid-1d}
+aim1_1d_valid <- lmer(
+  mood ~ pleasant_pmc + smoke_pmc + pleasant_pmc:smoke_pmc + 
+    pleasant_pm + smoke_pm + 
+    (1 + pleasant_pmc || participant_id),
+  data = aim1_valid_only,
+  REML = TRUE,
+  control = lmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 2e5))
+)
+
+summary(aim1_1d_valid)
+
+anova(aim1_1c_valid, aim1_1d_valid)
+```
+
+### Model 1e: Random slope for craving
+
+```{r aim1-valid-1e}
+aim1_1e_valid <- lmer(
+  mood ~ pleasant_pmc + smoke_pmc + pleasant_pmc:smoke_pmc + 
+    pleasant_pm + smoke_pm + 
+    (1 + pleasant_pmc + smoke_pmc || participant_id),
+  data = aim1_valid_only,
+  REML = TRUE,
+  control = lmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 2e5))
+)
+
+summary(aim1_1e_valid)
+
+anova(aim1_1d_valid, aim1_1e_valid)
+```
+
+### Model 1f: Random slope for interaction
+
+```{r aim1-valid-1f}
+aim1_1f_valid <- lmer(
+  mood ~ pleasant_pmc + smoke_pmc + pleasant_pmc:smoke_pmc + 
+    pleasant_pm + smoke_pm + 
+    (1 + pleasant_pmc + smoke_pmc + pleasant_pmc:smoke_pmc || participant_id),
+  data = aim1_valid_only,
+  REML = TRUE,
+  control = lmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 2e5))
+)
+
+summary(aim1_1f_valid)
+
+anova(aim1_1e_valid, aim1_1f_valid)
+```
+
+### Model comparison summary (Aim 1, Valid Cases Only)
+
+```{r aim1-valid-summary}
+aim1_valid_models <- list(
+  "1a: Unconditional" = aim1_1a_valid,
+  "1b: Main effects" = aim1_1b_valid,
+  "1c: + Interaction (fixed)" = aim1_1c_valid,
+  "1d: + Random slope (pleasant)" = aim1_1d_valid,
+  "1e: + Random slope (smoke)" = aim1_1e_valid,
+  "1f: + Random slope (interaction)" = aim1_1f_valid
+)
+
+kable(
+  data.frame(
+    Model = names(aim1_valid_models),
+    AIC = sapply(aim1_valid_models, AIC),
+    BIC = sapply(aim1_valid_models, BIC),
+    Deviance = sapply(aim1_valid_models, deviance),
+    df = sapply(aim1_valid_models, function(x) attr(logLik(x), "df"))
+  ),
+  caption = "Aim 1 Model Fit Comparison (Valid Cases Only)",
+  digits = 2
+) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+---
+
+# AIM 2: Stress Reactivity
+
+## Aim 2: All Available Data
+
+### Model 2a: Unconditional
+
+```{r aim2-all-2a}
+aim2_2a_all <- lmer(
+  mood ~ 1 + (1 | participant_id),
+  data = aim2_all_available,
+  REML = TRUE
+)
+
+summary(aim2_2a_all)
+```
+
+### Model 2b: Main effects
+
+```{r aim2-all-2b}
+aim2_2b_all <- lmer(
+  mood ~ unpleasant_pmc + smoke_pmc + unpleasant_pm + smoke_pm + 
+    (1 | participant_id),
+  data = aim2_all_available,
+  REML = TRUE
+)
+
+summary(aim2_2b_all)
+
+anova(aim2_2a_all, aim2_2b_all)
+```
+
+### Model 2c: Add interaction (fixed)
+
+```{r aim2-all-2c}
+aim2_2c_all <- lmer(
+  mood ~ unpleasant_pmc + smoke_pmc + unpleasant_pmc:smoke_pmc + 
+    unpleasant_pm + smoke_pm + 
+    (1 | participant_id),
+  data = aim2_all_available,
+  REML = TRUE
+)
+
+summary(aim2_2c_all)
+
+anova(aim2_2b_all, aim2_2c_all)
+```
+
+### Model 2d: Random slope for unpleasantness
+
+```{r aim2-all-2d}
+aim2_2d_all <- lmer(
+  mood ~ unpleasant_pmc + smoke_pmc + unpleasant_pmc:smoke_pmc + 
+    unpleasant_pm + smoke_pm + 
+    (1 + unpleasant_pmc || participant_id),
+  data = aim2_all_available,
+  REML = TRUE,
+  control = lmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 2e5))
+)
+
+summary(aim2_2d_all)
+
+anova(aim2_2c_all, aim2_2d_all)
+```
+
+### Model 2e: Random slope for craving
+
+```{r aim2-all-2e}
+aim2_2e_all <- lmer(
+  mood ~ unpleasant_pmc + smoke_pmc + unpleasant_pmc:smoke_pmc + 
+    unpleasant_pm + smoke_pm + 
+    (1 + unpleasant_pmc + smoke_pmc || participant_id),
+  data = aim2_all_available,
+  REML = TRUE,
+  control = lmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 2e5))
+)
+
+summary(aim2_2e_all)
+
+anova(aim2_2d_all, aim2_2e_all)
+```
+
+### Model 2f: Random slope for interaction
+
+```{r aim2-all-2f}
+aim2_2f_all <- lmer(
+  mood ~ unpleasant_pmc + smoke_pmc + unpleasant_pmc:smoke_pmc + 
+    unpleasant_pm + smoke_pm + 
+    (1 + unpleasant_pmc + smoke_pmc + unpleasant_pmc:smoke_pmc || participant_id),
+  data = aim2_all_available,
+  REML = TRUE,
+  control = lmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 2e5))
+)
+
+summary(aim2_2f_all)
+
+anova(aim2_2e_all, aim2_2f_all)
+```
+
+### Model comparison summary (Aim 2, All Available)
+
+```{r aim2-all-summary}
+aim2_all_models <- list(
+  "2a: Unconditional" = aim2_2a_all,
+  "2b: Main effects" = aim2_2b_all,
+  "2c: + Interaction (fixed)" = aim2_2c_all,
+  "2d: + Random slope (unpleasant)" = aim2_2d_all,
+  "2e: + Random slope (smoke)" = aim2_2e_all,
+  "2f: + Random slope (interaction)" = aim2_2f_all
+)
+
+kable(
+  data.frame(
+    Model = names(aim2_all_models),
+    AIC = sapply(aim2_all_models, AIC),
+    BIC = sapply(aim2_all_models, BIC),
+    Deviance = sapply(aim2_all_models, deviance),
+    df = sapply(aim2_all_models, function(x) attr(logLik(x), "df"))
+  ),
+  caption = "Aim 2 Model Fit Comparison (All Available Data)",
+  digits = 2
+) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+---
+
+## Aim 2: Valid Cases Only
+
+### Model 2a: Unconditional
+
+```{r aim2-valid-2a}
+aim2_2a_valid <- lmer(
+  mood ~ 1 + (1 | participant_id),
+  data = aim2_valid_only,
+  REML = TRUE
+)
+
+summary(aim2_2a_valid)
+```
+
+### Model 2b: Main effects
+
+```{r aim2-valid-2b}
+aim2_2b_valid <- lmer(
+  mood ~ unpleasant_pmc + smoke_pmc + unpleasant_pm + smoke_pm + 
+    (1 | participant_id),
+  data = aim2_valid_only,
+  REML = TRUE
+)
+
+summary(aim2_2b_valid)
+
+anova(aim2_2a_valid, aim2_2b_valid)
+```
+
+### Model 2c: Add interaction (fixed)
+
+```{r aim2-valid-2c}
+aim2_2c_valid <- lmer(
+  mood ~ unpleasant_pmc + smoke_pmc + unpleasant_pmc:smoke_pmc + 
+    unpleasant_pm + smoke_pm + 
+    (1 | participant_id),
+  data = aim2_valid_only,
+  REML = TRUE
+)
+
+summary(aim2_2c_valid)
+
+anova(aim2_2b_valid, aim2_2c_valid)
+```
+
+### Model 2d: Random slope for unpleasantness
+
+```{r aim2-valid-2d}
+aim2_2d_valid <- lmer(
+  mood ~ unpleasant_pmc + smoke_pmc + unpleasant_pmc:smoke_pmc + 
+    unpleasant_pm + smoke_pm + 
+    (1 + unpleasant_pmc || participant_id),
+  data = aim2_valid_only,
+  REML = TRUE,
+  control = lmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 2e5))
+)
+
+summary(aim2_2d_valid)
+
+anova(aim2_2c_valid, aim2_2d_valid)
+```
+
+### Model 2e: Random slope for craving
+
+```{r aim2-valid-2e}
+aim2_2e_valid <- lmer(
+  mood ~ unpleasant_pmc + smoke_pmc + unpleasant_pmc:smoke_pmc + 
+    unpleasant_pm + smoke_pm + 
+    (1 + unpleasant_pmc + smoke_pmc || participant_id),
+  data = aim2_valid_only,
+  REML = TRUE,
+  control = lmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 2e5))
+)
+
+summary(aim2_2e_valid)
+
+anova(aim2_2d_valid, aim2_2e_valid)
+```
+
+### Model 2f: Random slope for interaction
+
+```{r aim2-valid-2f}
+aim2_2f_valid <- lmer(
+  mood ~ unpleasant_pmc + smoke_pmc + unpleasant_pmc:smoke_pmc + 
+    unpleasant_pm + smoke_pm + 
+    (1 + unpleasant_pmc + smoke_pmc + unpleasant_pmc:smoke_pmc || participant_id),
+  data = aim2_valid_only,
+  REML = TRUE,
+  control = lmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 2e5))
+)
+
+summary(aim2_2f_valid)
+
+anova(aim2_2e_valid, aim2_2f_valid)
+```
+
+### Model comparison summary (Aim 2, Valid Cases Only)
+
+```{r aim2-valid-summary}
+aim2_valid_models <- list(
+  "2a: Unconditional" = aim2_2a_valid,
+  "2b: Main effects" = aim2_2b_valid,
+  "2c: + Interaction (fixed)" = aim2_2c_valid,
+  "2d: + Random slope (unpleasant)" = aim2_2d_valid,
+  "2e: + Random slope (smoke)" = aim2_2e_valid,
+  "2f: + Random slope (interaction)" = aim2_2f_valid
+)
+
+kable(
+  data.frame(
+    Model = names(aim2_valid_models),
+    AIC = sapply(aim2_valid_models, AIC),
+    BIC = sapply(aim2_valid_models, BIC),
+    Deviance = sapply(aim2_valid_models, deviance),
+    df = sapply(aim2_valid_models, function(x) attr(logLik(x), "df"))
+  ),
+  caption = "Aim 2 Model Fit Comparison (Valid Cases Only)",
+  digits = 2
+) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+---
+
+# Interpretation Checkpoints
+
+## Key questions to guide your sequential decision-making:
+
+**Aim 1: Reward Reactivity**
+- Does the pleasantness × craving interaction (Model 1c) improve fit and is it significant in the expected direction (negative)?
+- Does allowing random slopes for pleasantness and/or craving meaningfully improve the model?
+- How much variability in the interaction slope exists across individuals?
+- Do results replicate in the valid-cases-only sensitivity analysis?
+
+**Aim 2: Stress Reactivity**
+- Does the unpleasantness × craving interaction (Model 2c) improve fit and is it significant in the expected direction (positive)?
+- Does allowing random slopes for unpleasantness and/or craving meaningfully improve the model?
+- How much variability in the interaction slope exists across individuals?
+- Do results replicate in the valid-cases-only sensitivity analysis?
+
+**General Considerations**
+- Which models converge successfully? Are there optimizer warnings?
+- Do AIC/BIC comparisons and nested model tests align in their model preferences?
+- How sensitive are findings to the all-available vs. valid-only distinction?
+- Are effect sizes meaningful in addition to statistical significance?
+
+---
+
+# References
+
+Dyer, W.G. (2024). Dissertation analyses leveraging the DVAL project EMA data.
