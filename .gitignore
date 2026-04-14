@@ -10,3 +10,7 @@
 # OS files
 .DS_Store
 Thumbs.db
+
+# Addressing syncing error between git and onedrive
+
+*.html
